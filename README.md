@@ -68,6 +68,28 @@ Your existing configs are left untouched either way.
 Caddy comes up, takes 80 and 443 and issues a certificate for the domain from
 `DOMAIN` with no manual setup.
 
+### When a panel serves the static files instead
+
+This is the trap that costs the most time. A panel's own config usually ends
+with a regex for static extensions — css, js, png, ico and the rest — that
+serves such files from its own document root. Yours are not there, they are
+inside the container, so the pages come up while the stylesheet and the icons
+answer 404: a bare page with no design and an empty tab icon.
+
+The prefix blocks in the sample cover the directories, and the exact `location
+= ` blocks cover the files that lie in the root: `assets.css`, the three
+favicons, `apple-touch-icon.png` and `robots.txt`. Both kinds are there for
+this reason. An exact match beats any regex in nginx whatever the order of the
+includes, while a prefix with `^~` beats it as well — that is what makes the
+sample work without touching the panel's own config.
+
+If you build the config yourself and a file still answers 404, check it with
+
+    curl -I https://your-domain/assets.css
+
+A 404 with the panel's own server header means the request never reached the
+container: add a `location = ` for that file the way the sample does.
+
 ### About the firewall
 
 Docker is known for writing its own iptables rules and stepping around
