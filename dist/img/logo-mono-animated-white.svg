@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36.7 68.2" preserveAspectRatio="xMidYMid meet">
+  <style>polygon.led { transition: fill .25s ease; }</style>
+  <polygon fill="#FFFFFF" points="0,40.7 0,52.4 10.8,56.6 10.8,45"/>
+  <polygon fill="#FFFFFF" points="0,17.5 0,29.1 10.8,33.3 10.8,21.7"/>
+  <polygon class="led" fill="#FFFFFF" points="36.7,11.6 10.8,21.7 10.8,10.1 36.7,0"/>
+  <polygon class="led" fill="#FFFFFF" points="36.7,34.9 10.8,45 10.8,33.3 36.7,23.3"/>
+  <polygon class="led" fill="#FFFFFF" points="36.7,58.2 10.8,68.2 10.8,56.6 36.7,46.5"/>
+  <script><![CDATA[
+    const COLORS = ['#FFFFFF', '#E27474', '#95C11F'];
+    const leds = Array.from(document.querySelectorAll('polygon.led'));
+    leds.forEach(led => {
+      function tick() {
+        const cur = led.getAttribute('fill');
+        let next;
+        do { next = COLORS[Math.floor(Math.random() * COLORS.length)]; } while (next === cur);
+        led.setAttribute('fill', next);
+        const r = Math.random();
+        const hold = Math.round(120 + Math.pow(r, 2.2) * 1800);
+        setTimeout(tick, hold);
+      }
+      setTimeout(tick, Math.random() * 400);
+    });
+  ]]></script>
+</svg>

@@ -1,0 +1,13 @@
+# The certificate is issued automatically if the domain points at this machine.
+{$DOMAIN} {
+	encode gzip
+
+	# the websocket used by the app and the boards lives at its own path
+	handle /ws* {
+		reverse_proxy ws:{$WS_PORT}
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+}

@@ -1,0 +1,80 @@
+# The whole Entrixy server: database, web part, websocket worker and TLS proxy.
+# Run: cp .env.example .env && edit it && docker compose up -d --build
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD: ${DB_PASS}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d:ro     # schema is loaded on first start
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/php.Dockerfile
+    restart: unless-stopped
+    # The port is published on the loopback address: the proxy exposes it,
+    # and Docker does not step around the machine's firewall doing so.
+    ports:
+      - "${HTTP_BIND:-127.0.0.1:8082}:80"
+    depends_on:
+      db: {condition: service_healthy}
+    volumes:
+      - ./secrets:/app/secrets:ro      # Firebase key, if you want push notifications
+    environment: &app_env
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      WS_HOST: ${WS_HOST:-0.0.0.0}
+      WS_PORT: ${WS_PORT:-8095}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_ATTEST_SECRET: ${APP_ATTEST_SECRET}
+      SITE_URL: https://${DOMAIN}
+      RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-60}
+      ACCESS_CODE: ${ACCESS_CODE:-}
+      FCM_SA_FILE: /app/secrets/fcm-service-account.json
+
+  ws:
+    build:
+      context: .
+      dockerfile: docker/ws.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WS_BIND:-127.0.0.1:8095}:8095"
+    depends_on:
+      db: {condition: service_healthy}
+    volumes:
+      - ./secrets:/app/secrets:ro
+    environment: *app_env
+
+  caddy:
+    image: caddy:2
+    profiles: ["tls"]          # comes up only with --profile tls
+    restart: unless-stopped
+    depends_on: [web, ws]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      WS_PORT: ${WS_PORT:-8095}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

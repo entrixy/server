@@ -1,0 +1,39 @@
+# URL rules for a self-hosted installation.
+#
+# Only the addresses that exist here are listed: three pages and the guard on
+# service files.
+
+RewriteEngine On
+
+# The page language comes from the address prefix: /ru/i/<code> and so on.
+# Without these rules a guest with a non-English browser would get a 404, since
+# the page redirects itself to the prefix of its language. The code is handed to
+# the page in the SITELANG variable, and the dictionary is chosen by it.
+# The guest key page: /key
+RewriteRule ^key/?$ key.php [L]
+RewriteRule ^(ru|de|es|fr|pt|zh)/key/?$ key.php [E=SITELANG:$1,L]
+
+# A chain invitation: /i/<code>
+RewriteRule ^i/([A-Za-z0-9_-]{10,22})/?$ key_invite.php?code=$1 [L,QSA]
+RewriteRule ^(ru|de|es|fr|pt|zh)/i/([A-Za-z0-9_-]{10,22})/?$ key_invite.php?code=$2 [E=SITELANG:$1,L,QSA]
+
+# A company request: /c/<code>
+RewriteRule ^c/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$1 [L,QSA]
+RewriteRule ^o/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$1 [L,QSA]
+RewriteRule ^(ru|de|es|fr|pt|zh)/c/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$2 [E=SITELANG:$1,L,QSA]
+RewriteRule ^(ru|de|es|fr|pt|zh)/o/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$2 [E=SITELANG:$1,L,QSA]
+
+# Service files are never served.
+<FilesMatch "\.(log|sql|tsv|ini|bak|sh|env|lock|md)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "^(_config|_config_functions|_bootstrap)\.php$">
+    Require all denied
+</FilesMatch>
+Options -Indexes
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
