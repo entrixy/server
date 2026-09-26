@@ -430,6 +430,20 @@ server looks broken. A client free of that trap is included:
 
 The same check with curl is fine, but pass `--http1.1` explicitly.
 
+### A 101 without the Upgrade header
+
+The worker answers a handshake with `Upgrade: websocket`. Some panel setups
+hide response headers, and the answer reaches the client without it. Browsers
+and the Android client refuse such a handshake by the standard and reconnect
+forever, while the page and the API keep working — which makes it look like a
+problem in the app rather than in the proxy. In the app's log it reads as
+
+    Expected 'Upgrade' header value 'websocket' but was 'null'
+
+`tools/ws_check.py` reports it explicitly, and the samples pass the header on
+with `proxy_pass_header Upgrade;`. If you wrote the config yourself, add that
+line to the `/ws` location, or remove whatever clears response headers there.
+
 ## Why image sizes differ
 
 Almost all of the weight is the PHP base image; our part adds about thirty

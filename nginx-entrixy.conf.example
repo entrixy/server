@@ -22,7 +22,12 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         # A websocket connection is long-lived: without these it is cut after
         # a minute of silence and the phone reconnects over and over.
-        proxy_read_timeout 3600s;
+        # The worker answers 101 with `Upgrade: websocket`. Some panel setups hide
+    # response headers, and the answer arrives without it — a browser and the
+    # Android client then refuse the handshake and reconnect forever, while a
+    # lenient check still reports 101. Passing it explicitly costs nothing.
+    proxy_pass_header Upgrade;
+    proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
     }
 

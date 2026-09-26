@@ -41,6 +41,21 @@ print('handshake:', status)
 if '101' not in status:
     sys.exit('no upgrade happened - check the proxy config')
 
+# A 101 alone is not enough. Some panel configurations hide response headers,
+# and the answer arrives without `Upgrade: websocket`. Browsers and Android
+# clients reject exactly that, while a lenient checker would call it healthy —
+# so the header is verified here explicitly.
+head_lines = [l.decode(errors='replace').lower() for l in head.split(b'\r\n')]
+if not any(l.startswith('upgrade:') and 'websocket' in l for l in head_lines):
+    print('handshake headers:')
+    for l in head.decode(errors='replace').split('\r\n')[1:]:
+        if l.strip():
+            print('   ', l)
+    sys.exit('the 101 came without the Upgrade header: the proxy is hiding it. '
+             'Add `proxy_pass_header Upgrade;` to the /ws location, or remove '
+             'whatever clears response headers there. Clients refuse such a '
+             'handshake and reconnect forever.')
+
 # masked frame: {"type":"ping"}
 payload = json.dumps({'type': 'ping'}).encode()
 mask = os.urandom(4)
