@@ -24,24 +24,48 @@ Russian version of this file: [README.ru.md](README.ru.md).
 
 ## What you need
 
-Any machine with Docker and a domain whose A record points at it. The
+Any machine with Docker and git, and a domain whose A record points at it. The
 certificate is issued automatically; nothing has to be set up by hand.
 
 ## Installation
 
-    tar xzf entrixy-server-*.tar.gz && cd entrixy-server
+    git clone https://github.com/entrixy/server.git entrixy-server
+    cd entrixy-server
     cp .env.example .env
     nano .env                      # domain, database passwords, secrets
     docker compose up -d --build
 
 The first start takes a few minutes: images are built and the database schema
 is loaded. The containers listen on the loopback address only — the web part
-on `127.0.0.1:8082`, the websocket on `127.0.0.1:8095`. To check that both are
-alive:
+on `127.0.0.1:8082`, the websocket on `127.0.0.1:8095`.
+
+Two values in `.env` have to be generated rather than invented:
+
+    openssl rand -hex 32           # JWT_SECRET
+
+The database passwords can be anything: they never leave the machine.
+`APP_ATTEST_SECRET` already carries the value that matches the app from the
+store — leave it as it is unless you build the app yourself.
+
+### After the first start
+
+Three checks, in this order. The first says the web part is up and the
+database is in place:
 
     curl -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8082/key
 
-A `200` means the web part is up and the database is in place.
+A `200` is what you want. Then, once the domain is proxied, the page should
+come up with its styling and its tab icon — if it is bare, the panel is
+serving the static files instead, and the section below says what to do. And
+the websocket, which has a trap of its own:
+
+    python3 tools/ws_check.py wss://your-domain/ws     # expect 101 and pong
+
+Out of the box the door is open: any app told your address will create a
+device. That is deliberate — a server for yourself usually needs nothing more.
+If it is meant for a circle of people, close it with a code or with
+invitations before you hand the address out; see "A server for your own people
+only".
 
 ## Exposing the server
 
@@ -135,14 +159,13 @@ survives a restart of the other.
 
 ## Updating
 
-Unpack the new archive over the old one, keeping your `.env`, and bring it up
-again:
-
+    git pull
     docker compose up -d --build
 
-The database schema catches up on its own. On start the web part compares the
-database with the schema that came in the archive and adds whatever is missing
-— tables, columns, indexes. The log says exactly what was added:
+Your `.env` stays where it is — it is not tracked. The database schema catches
+up on its own: on start the web part compares the database with the schema
+that came with the code and adds whatever is missing — tables, columns,
+indexes. The log says exactly what was added:
 
     docker compose logs web | tail
 
@@ -337,7 +360,7 @@ change them there.
 
 ## Building without internet access
 
-The apcu sources sit in the archive itself (`vendor/`), and the build queries
+The apcu sources sit in the repository itself (`vendor/`), and the build queries
 no external hosts beyond the Debian repositories and the image registry. On a
 machine that may only reach mirrors, that is enough.
 
