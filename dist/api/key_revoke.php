@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('key_revoke', 60);
 require_once __DIR__ . '/../lib/org.php';   // company requests and the callback
 [$host_id, $j] = host_auth();
 

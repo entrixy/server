@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('key_set_mode', 60);
 [$host_id, $j] = host_auth();
 
 $id = (int)($j['id'] ?? 0);

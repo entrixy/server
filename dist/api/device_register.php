@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('device_register', 20);
 [$host_id, $j] = host_auth();
 
 $label = trim((string)($j['label'] ?? ''));

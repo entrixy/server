@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('number_add', 30);
 require_once __DIR__ . '/../lib/account.php';
 [$host_id, $j] = host_auth();
 

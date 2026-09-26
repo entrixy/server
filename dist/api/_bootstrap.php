@@ -18,7 +18,8 @@ function jout($a, $code = 200) {
  * Throws 429 past $limitPerMin. If APCu is unavailable it does nothing, so the
  * endpoint keeps working.
  */
-function rate_limit_check(string $bucketKey, int $limitPerMin = 60): void {
+function rate_limit_check(string $bucketKey, ?int $limitPerMin = null): void {
+    $limitPerMin = $limitPerMin ?? (int)($GLOBALS['requests_per_min'] ?? 300);
     if (!function_exists('apcu_inc')) return;
     $ipH = client_ip_hash();
     if ($ipH === '') return;
@@ -126,3 +127,13 @@ function host_auth() {
 
     return [(int)$row['id'], $j];
 }
+
+/**
+ * A baseline for every endpoint, applied the moment this file is included.
+ *
+ * Explicit rate_limit_check() calls stay where they are and keep the sensitive
+ * points tighter; this is the floor under everything else, so that a new
+ * endpoint is never born without a limit. The bucket is the script's own name,
+ * the ceiling comes from REQUESTS_PER_MIN.
+ */
+rate_limit_check('ep:' . basename((string)($_SERVER['SCRIPT_FILENAME'] ?? 'api')));

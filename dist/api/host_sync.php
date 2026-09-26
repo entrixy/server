@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('host_sync', 120);
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/org.php';
 

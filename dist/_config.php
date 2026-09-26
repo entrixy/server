@@ -20,6 +20,8 @@ $GLOBALS['ws_host'] = envv('WS_HOST', '0.0.0.0');
 $GLOBALS['ws_port'] = (int)envv('WS_PORT', '8095');
 
 $GLOBALS['rate_limit_per_min'] = (int)envv('RATE_LIMIT_PER_MIN', '60');
+// Потолок обращений к одной точке входа с одного адреса за минуту.
+$GLOBALS['requests_per_min']   = (int)envv('REQUESTS_PER_MIN', 300);
 
 $GLOBALS['jwt_secret']        = envv('JWT_SECRET');
 $GLOBALS['jwt_ttl']           = 30 * 86400;

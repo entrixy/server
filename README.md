@@ -265,6 +265,27 @@ keys, revocation — but appear in the app by name, without marks of
 authenticity. Otherwise any server could pass itself off as a well-known
 company, and a person would have no way to check.
 
+## Request limits
+
+Every endpoint has a ceiling, and it is applied the moment a request arrives
+rather than endpoint by endpoint: whatever a new endpoint forgets to declare,
+the floor is already under it. The floor is `REQUESTS_PER_MIN` — requests from
+one address to one endpoint per minute, 300 by default.
+
+The sensitive points are held tighter in the code and are not affected by that
+setting: registering a device is five a minute, claiming a controller twenty,
+creating a key thirty, and so on. Opening is limited separately, per key, by
+`RATE_LIMIT_PER_MIN`.
+
+Do not set the floor low without a reason. Thousands of subscribers sit behind
+one carrier address, and a strict number would cut the neighbours off along
+with whoever you meant to stop. Counting happens in APCu inside the web
+container, so a restart clears it — which is a property, not a bug: the limits
+exist to bound a flood, not to punish anyone.
+
+Over the limit the server answers 429 with `retry_after`, and the app waits
+that out by itself.
+
 ## A server for your own people only
 
 By default the server is open: any app that is told your address will create a

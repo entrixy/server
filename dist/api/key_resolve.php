@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/_bootstrap.php';
+rate_limit_check('key_resolve', 60);
 
 // Looks a key up by user_key for the current host.
 // The offline-first client needs it: if key_create answered user_key_collision —
