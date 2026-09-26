@@ -43,7 +43,11 @@ RUN printf '<Directory /var/www/html>\n  AllowOverride All\n  Require all grante
 RUN printf 'RemoteIPHeader X-Forwarded-For\nRemoteIPTrustedProxy 127.0.0.1\nRemoteIPTrustedProxy 172.16.0.0/12\n' \
       > /etc/apache2/conf-available/remoteip.conf && a2enconf remoteip
 
-RUN printf 'apc.enable_cli=1\nopcache.enable=1\nupload_max_filesize=16M\npost_max_size=16M\n' \
+# Errors go to the log, never to the visitor: a PHP warning otherwise prints
+# absolute paths and the shape of the code to whoever asked for the page.
+# expose_php hides the version from the response headers for the same reason.
+RUN printf 'apc.enable_cli=1\nopcache.enable=1\nupload_max_filesize=16M\npost_max_size=16M\n\
+display_errors=Off\nlog_errors=On\nerror_log=/dev/stderr\nexpose_php=Off\n' \
       > /usr/local/etc/php/conf.d/entrixy.ini
 
 COPY docker/entrypoint.sh /usr/local/bin/entrixy-entrypoint
@@ -57,3 +61,7 @@ ENTRYPOINT ["entrixy-entrypoint"]
 CMD ["apache2-foreground"]
 
 COPY --chown=www-data:www-data dist/ /var/www/html/
+
+# The websocket worker runs in its own container and has no business in the web
+# root: over HTTP its source only ever answers with an error and a path.
+RUN rm -rf /var/www/html/w

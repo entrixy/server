@@ -23,6 +23,10 @@ RewriteRule ^o/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$1 [L,QSA]
 RewriteRule ^(ru|de|es|fr|pt|zh)/c/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$2 [E=SITELANG:$1,L,QSA]
 RewriteRule ^(ru|de|es|fr|pt|zh)/o/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?code=$2 [E=SITELANG:$1,L,QSA]
 
+# The websocket worker's sources are not a web page. They are removed from the
+# web container at build time; this is the second lock, for a hand-built image.
+RedirectMatch 404 ^/w(/|$)
+
 # Service files are never served.
 <FilesMatch "\.(log|sql|tsv|ini|bak|sh|env|lock|md)$">
     Require all denied

@@ -114,6 +114,20 @@ If you build the config yourself and a file still answers 404, check it with
 A 404 with the panel's own server header means the request never reached the
 container: add a `location = ` for that file the way the sample does.
 
+### Errors and what the visitor sees
+
+PHP errors go to the container log, never into the answer: a warning shown to
+a visitor prints absolute paths and the shape of the code. The version is kept
+out of the response headers for the same reason. Both are set in the image, so
+there is nothing to configure.
+
+The websocket worker's sources are removed from the web container at build
+time — it runs in its own container and has nothing to say over HTTP. The URL
+rules refuse `/w/` as well, which covers an image built by hand.
+
+If you see a PHP error in a browser, you are looking at an image built before
+this was fixed: rebuild with `git pull && docker compose up -d --build`.
+
 ### About the firewall
 
 Docker is known for writing its own iptables rules and stepping around
