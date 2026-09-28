@@ -76,28 +76,18 @@ switch ($d['action']) {
         jout(['ok' => 1, 'bound' => 'same', 'device_key' => $device_pub !== null]);
 
     case 'move':
-        // A key that already carries a device's own pair does not travel. The
-        // link alone is not enough to take it over; a new phone needs a new
-        // key from the owner.
-        if (!empty($row['sign_pub_device'])) {
-            jout(['error' => 'needs_new_key'], 409);
-        }
-        // A move to a new phone: the previous device is evicted and wipes itself on
-        // its next contact. The owner gets a line in the log; from handing the phone
-        // over this is indistinguishable, so there is no need to bother anyone.
-        device_move_apply('user_keys', $kid, $device_fp, $current);
-        $remember_pub();
-        if (function_exists('audit_log')) {
-            audit_log((int)$row['host_id'], 'key_moved', 'user_key', $kid, []);
-        }
-        jout(['ok' => 1, 'bound' => 'moved']);
+        // A key belongs to the device that used it first, and it does not
+        // travel: a browser, a phone, another phone — whichever came first
+        // keeps it. Whoever arrives second is told so plainly, and the owner
+        // issues them a key of their own. Letting the second device take over
+        // would mean a copy of the link is enough to walk in.
+        jout(['error' => 'already_bound'], 403);
 
     case 'evicted':
         jout(['error' => 'evicted'], 409);
 
-    default:  // wait
-        jout([
-            'error'       => 'move_too_soon',
-            'retry_after' => $d['retry_after'],
-        ], 429);
+    default:
+        // A key that moved once, long ago, and is asked for again: the same
+        // answer as any second device gets.
+        jout(['error' => 'already_bound'], 403);
 }
