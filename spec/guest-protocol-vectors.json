@@ -1,0 +1,27 @@
+{
+    "suite": "v1",
+    "user_key": "TESTvector_userkey_0123456789abc",
+    "seed": "b7752d2b05e8ed1a850a7b9451b23cd9c88da0b1b805285faaf2143981509e98",
+    "sign_pub_hex": "17bd4b4ebc02752dd74c05091bb5fe5427480465bfd35237a2f0678d1162633b",
+    "sign_pub_b64url": "F71LTrwCdS3XTAUJG7X-VCdIBGW_01I3ovBnjRFiYzs",
+    "key_id": "986a908ef63f57ab606977ba7d76248d7dff01d48d627efa95479b0ba3df6af5",
+    "request": {
+        "ts": "1790000000",
+        "nonce": "0123456789abcdef0123456789abcdef",
+        "endpoint": "key_bind",
+        "body": "{\"device_fp\":\"aaaa\"}",
+        "material": "v1.986a908ef63f57ab606977ba7d76248d7dff01d48d627efa95479b0ba3df6af5.1790000000.0123456789abcdef0123456789abcdef.key_bind.6de43f3094fca1abcd581340d6ee48bc78921af3892ae68b556d9f626e204872",
+        "sig_b64": "4+ACUxMQ/AcN3hhR+1rFCfJf15RY0BAlEVmIywIaNtCFX9yJkehSUL6elkpwI88PdMk2MRrJbxpMPN+HTYgRCQ=="
+    },
+    "hello": {
+        "device_fp": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "material": "v1.986a908ef63f57ab606977ba7d76248d7dff01d48d627efa95479b0ba3df6af5.1790000000.0123456789abcdef0123456789abcdef.guest_hello.ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb",
+        "sig_b64": "DmigCW653zJ4m21WunRKBM66EsCEz4VavQAuBOqe73jivdzfsvKnAVAC9L7b5t4OtxXGlbolHfwPyyWeo46BCw=="
+    },
+    "device_pair": {
+        "device_fp": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "seed": "9998e85347cd2912f16bb2bcb91e3c3f767494a7b9da30f16cee9b0ca448ed31",
+        "device_pub_hex": "eb9c44b8a3ee79f166fb9c72546818e32d4ed8de1537f2fa555ebfdbd4610186",
+        "device_pub_b64url": "65xEuKPuefFm-5xyVGgY4y1O2N4VN_L6VV6_29RhAYY"
+    }
+}

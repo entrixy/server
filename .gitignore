@@ -1,0 +1,8 @@
+# The installation's own settings: written by hand or by tools/install-native.sh,
+# never part of the distribution. Keeping it out of git is what lets `git pull`
+# update a server without touching its secrets.
+dist/_config.local.php
+
+# What a running installation leaves behind.
+.env
+*.log

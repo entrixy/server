@@ -1,0 +1,44 @@
+/* Styles for the pages of a self-hosted installation.
+ *
+ * On a full site these pages lean on a stylesheet of several hundred kilobytes and
+ * a dozen animation libraries. Here there are three screens — the key, the
+ * invitation and a company's request — and they need a dozen rules, which follow. */
+
+:root { --ink:#1e1f29; --muted:rgba(30,31,41,.6); --bg:#fff; --hero:#12172b; }
+
+*, *::before, *::after { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+       font-family:'Inter Tight', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+       -webkit-font-smoothing:antialiased; }
+
+.main-container { width:100%; max-width:1100px; margin:0 auto; padding:0 20px; }
+.mx-auto { margin-left:auto; margin-right:auto; }
+.text-center { text-align:center; }
+.relative { position:relative; }
+.overflow-hidden { overflow:hidden; }
+.z-0 { z-index:0; } .z-30 { z-index:30; }
+.mb-3 { margin-bottom:12px; }
+.pt-46 { padding-top:46px; }
+.pb-10 { padding-bottom:40px; }
+.max-w-\[560px\] { max-width:560px; }
+.max-w-\[680px\] { max-width:680px; }
+.leading-\[1\.1\] { line-height:1.1; }
+
+.font-light { font-weight:300; }
+.font-medium { font-weight:500; }
+.text-white { color:#fff; }
+.text-heading-4 { font-size:28px; }
+.text-tagline-1 { font-size:15px; }
+.cfg-sub { color:var(--muted); font-size:15px; line-height:1.6; }
+.warn { color:#b3261e; }
+
+/* The dark page header: on the full site this is an animated background, here a
+   plain gradient. */
+.hero-bg { background:var(--hero); }
+
+@media (min-width:640px) { .sm\:text-heading-3 { font-size:34px; } }
+@media (min-width:768px) {
+  .md\:text-heading-3 { font-size:34px; }
+  .md\:pt-\[204px\] { padding-top:96px; }
+  .md\:pb-16 { padding-bottom:64px; }
+}

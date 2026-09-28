@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 68.2 68.2">
+  <!-- The favicon: a grey body (#667085) that reads on both light and dark tab
+       backgrounds, with the brand green and red kept as accents. The mark is
+       vertical, 36.7×68.2, centred inside the square. -->
+  <g transform="translate(15.75 0)">
+    <polygon fill="#667085" points="36.7,58.2 10.8,68.2 10.8,56.6 36.7,46.5"/>
+    <polygon fill="#667085" points="0,40.7 0,52.4 10.8,56.6 10.8,45"/>
+    <polygon fill="#667085" points="0,17.5 0,29.1 10.8,33.3 10.8,21.7"/>
+    <polygon fill="#95C11F" points="36.7,34.9 10.8,45 10.8,33.3 36.7,23.3"/>
+    <polygon fill="#E27474" points="36.7,11.6 10.8,21.7 10.8,10.1 36.7,0"/>
+  </g>
+</svg>

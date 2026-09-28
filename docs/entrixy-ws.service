@@ -1,0 +1,34 @@
+# The websocket worker as a systemd unit, for an installation without Docker.
+# See "Installing without Docker" in the README; tools/install-native.sh does
+# all of this for you.
+#
+# The settings file holds the database password. It is owned by root and read
+# by the worker's group, so the worker can read it and nobody else can:
+#
+#   groupadd --system entrixy
+#   useradd --system --no-create-home --gid entrixy entrixy
+#   install -o root -g entrixy -m 640 ws-config.json /etc/entrixy/ws-config.json
+
+[Unit]
+Description=Entrixy websocket worker
+After=network.target mariadb.service mysql.service
+Wants=network.target
+# A worker that cannot start — a wrong password, a database still coming up —
+# must keep trying rather than give up and need `systemctl reset-failed` from
+# someone who does not yet know that command exists.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/local/bin/entrixy-ws -config /etc/entrixy/ws-config.json
+User=entrixy
+Group=entrixy
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/entrixy
+
+[Install]
+WantedBy=multi-user.target

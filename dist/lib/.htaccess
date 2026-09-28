@@ -1,0 +1,3 @@
+# lib/ holds server-side includes. Direct access is not allowed: they are pulled
+# in from PHP with require.
+Require all denied
