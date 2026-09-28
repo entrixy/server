@@ -47,10 +47,20 @@ trying.
 
 ### To update a running server
 
+With Docker:
+
     git pull
     docker compose up -d --build
 
-The build is required: the websocket image is a different program now. The
-database catches up by itself at start — new columns are added, nothing is
-dropped. Guests and owners reconnect on their own; keys already issued keep
-working.
+Without Docker, where the worker runs as a service and the web half is just
+files:
+
+    git pull
+    cd ws && CGO_ENABLED=0 go build -mod=vendor -trimpath -o /usr/local/bin/entrixy-ws .
+    systemctl restart entrixy-ws
+    # then copy dist/ over your web root, keeping _config.local.php as it is
+
+Either way the database catches up by itself at start — new columns are added,
+nothing is dropped. Guests and owners reconnect on their own; keys already
+issued keep working. Do not run the Docker command on a machine where the
+service already holds the port: the two workers would fight over it.
