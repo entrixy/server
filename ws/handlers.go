@@ -263,8 +263,16 @@ func guestHello(c *Conn, msg map[string]any) {
 	                 FROM user_keys uk WHERE uk.key_hash = ? AND uk.enabled = 1`, hash).
 		Scan(&ukID, &hostID, &mode, &boundFP, &nativeOnly, &orgID, &expiresAt,
 			&signPub, &signSuite, &signPubDevice)
-	if err != nil || len(signPub) == 0 {
+	if err != nil {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
+		return
+	}
+	// The key exists but carries no public half: it was issued before keys
+	// were signed, and nothing here can check it. Saying "unknown key" would
+	// reach the guest as "the owner revoked this", which is not what happened
+	// — the key is simply too old to use, and the owner issues a new one.
+	if len(signPub) == 0 {
+		c.sendThenClose(map[string]any{"type": "error", "reason": "needs_new_key"})
 		return
 	}
 	keySuite := signSuite.String
