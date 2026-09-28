@@ -39,9 +39,29 @@ else
     printf 'Database host [127.0.0.1]: ';    read -r dbh;  dbh=${dbh:-127.0.0.1}
     printf 'Database name [entrixy]: ';     read -r db;   db=${db:-entrixy}
     printf 'Database user [entrixy]: ';     read -r user; user=${user:-entrixy}
-    printf 'Database password: ';           read -r pass
+    printf 'Database password: '
+    # Без эха, если перед нами терминал. Когда ввод идёт из файла, stty
+    # ругается — это не повод обрывать установку.
+    stty -echo 2>/dev/null || true
+    read -r pass
+    stty echo 2>/dev/null || true
+    printf '\n'
     jwt=$(openssl rand -hex 32)
-    att=$(openssl rand -hex 32)
+    # The attestation value has to match the build of the app you connect from.
+    # For the app from the store it is the one below, which is not a secret:
+    # it sits inside the installable file. Generate your own only when you
+    # build the app yourself — with a value of your own, keys marked "app only"
+    # stop opening from the store app.
+    att=$(grep -m1 '^APP_ATTEST_SECRET=' "$here/.env.example" 2>/dev/null | cut -d= -f2-)
+    if [ -z "$att" ]; then
+        say "Could not read APP_ATTEST_SECRET from .env.example; see the README."
+        exit 1
+    fi
+    if ask "Do you build the app yourself (rather than install it from the store)?"; then
+        att=$(openssl rand -hex 32)
+        say "   Generated an attestation value of your own. Put the same one into"
+        say "   your build, or keys marked \"app only\" will not open."
+    fi
     cat > "$local_cfg" <<CFG
 <?php
 // Written by tools/install-native.sh. An update never touches this file.
