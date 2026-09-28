@@ -89,6 +89,7 @@ Content-Type: application/json
     'every' => 'toutes les',
     'With' => 'Avec',
     'instead of' => 'au lieu de',
+    'Who' => 'Qui',
     'Check' => 'Vérification',
     'empty' => 'vide',
     'Guest' => 'Invité',

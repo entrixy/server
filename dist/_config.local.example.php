@@ -31,6 +31,10 @@ $GLOBALS['app_attest_secret'] = '';
 // address; set a code, or hand out single-use invitations instead.
 $GLOBALS['access_code'] = '';
 
+// Whose page may read this server's answers in a browser. The browser client
+// lives at entrixy.com; change this only if you host a copy of it yourself.
+$GLOBALS['app_origin'] = 'https://entrixy.com';
+
 // The websocket worker listens here, and your web server proxies /ws to it.
 $GLOBALS['ws_host'] = '127.0.0.1';
 $GLOBALS['ws_port'] = 8095;

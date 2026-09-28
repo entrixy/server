@@ -3,6 +3,31 @@ require __DIR__ . '/../_config.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
+/**
+ * The browser client is served from one address and may talk to any server a
+ * key was issued on, so a server has to say whose page is allowed to read its
+ * answers. Nothing is trusted because of this: every guest request still
+ * carries a signature, and no cookies travel here at all.
+ *
+ * `app_origin` names that page; a server running its own copy of the client
+ * points this at itself.
+ */
+$__appOrigin = (string)($GLOBALS['app_origin'] ?? 'https://entrixy.com');
+$__origin    = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+if ($__origin !== '' && hash_equals($__appOrigin, $__origin)) {
+    header('Access-Control-Allow-Origin: ' . $__appOrigin);
+    header('Vary: Origin');
+    header('Access-Control-Allow-Headers: Content-Type, X-Entrixy-Key, X-Entrixy-Ts, '
+         . 'X-Entrixy-Nonce, X-Entrixy-Sig, X-Entrixy-Suite');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Max-Age: 600');
+}
+// The browser asks before sending a signed request; the question needs no body.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 function jin() {
     $raw = file_get_contents('php://input');
     $j = json_decode($raw, true);

@@ -44,6 +44,7 @@ services:
       RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-60}
       REQUESTS_PER_MIN: ${REQUESTS_PER_MIN:-300}
       ACCESS_CODE: ${ACCESS_CODE:-}
+      APP_ORIGIN: ${APP_ORIGIN:-https://entrixy.com}
       FCM_SA_FILE: /app/secrets/fcm-service-account.json
 
   ws:

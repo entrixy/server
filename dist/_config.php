@@ -35,6 +35,9 @@ $GLOBALS['jwt_secret']        = envv('JWT_SECRET');
 $GLOBALS['jwt_ttl']           = 30 * 86400;
 // A closed server: while no code is set, anyone may register a device.
 $GLOBALS['access_code']     = envv('ACCESS_CODE', '');
+// Whose page may read this server's answers in a browser. The browser client
+// lives at entrixy.com; point this at yourself if you host a copy of it.
+$GLOBALS['app_origin']      = envv('APP_ORIGIN', 'https://entrixy.com');
 $GLOBALS['app_attest_secret'] = envv('APP_ATTEST_SECRET');
 
 

@@ -89,6 +89,7 @@ Content-Type: application/json
     'every' => '），每隔',
     'With' => '使用',
     'instead of' => '而不是',
+    'Who' => '谁',
     'Check' => '校验',
     'empty' => '空',
     'Guest' => '访客',

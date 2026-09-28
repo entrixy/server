@@ -89,6 +89,7 @@ Content-Type: application/json
     'every' => 'каждые',
     'With' => 'При',
     'instead of' => 'вместо',
+    'Who' => 'Кто',
     'Check' => 'Проверка',
     'empty' => 'пустой',
     'Guest' => 'Гость',
