@@ -287,7 +287,16 @@ func guestHello(c *Conn, msg map[string]any) {
 	raw, err := base64.StdEncoding.DecodeString(sig)
 	if err != nil || len(raw) != 64 || len(pub) != 32 ||
 		!ed25519.Verify(ed25519.PublicKey(pub), []byte(material), raw) {
-		c.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
+		// The key has settled on a device and this is the pair derived from
+		// the link: whoever is asking does hold the link, but on another
+		// device. Saying "unknown key" here would reach them as "the owner
+		// revoked it", which is a different thing entirely.
+		reason := "bad_key"
+		if len(signPubDevice) == 32 && len(signPub) == 32 &&
+			ed25519.Verify(ed25519.PublicKey(signPub), []byte(material), raw) {
+			reason = "already_bound"
+		}
+		c.sendThenClose(map[string]any{"type": "error", "reason": reason})
 		return
 	}
 
