@@ -1,9 +1,9 @@
 <?php
 /**
- * Where a chain invitation lands: /i/<code>.
+ * Where a passed-on key lands: /i/<code>.
  * The link is sent not by the object's owner but by a guest whom the owner allowed
- * to pass access on. Here a person sees what is being offered and opens the
- * invitation in the app, where the key is born on their own device.
+ * to pass access on. Here a person sees what is being offered and opens the key
+ * in the app, where it is born on their own device.
  */
 require __DIR__ . '/_config.php';
 require_once __DIR__ . '/lib/account.php';   // site_url(): this server's own address
@@ -29,8 +29,8 @@ if ($code !== '') {
     if ($seen) $state = in_array('new', $seen, true) ? 'new' : $seen[0];
 }
 
-$pageTitle     = 'Access invitation — Entrixy';
-$pageDesc      = 'Someone is passing you access to a barrier. Open the invitation in the app — the key is created on your phone.';
+$pageTitle     = 'Someone passed you a key — Entrixy';
+$pageDesc      = 'Someone passed you a key. Open it in the app: the key is created on your phone.';
 $pageCanonical = site_url('/i');
 require __DIR__ . '/partials/head.php';
 ?>
@@ -52,19 +52,20 @@ require __DIR__ . '/partials/head.php';
 <main>
 <section class="pt-46 md:pt-[204px] hero-bg relative z-0 overflow-hidden pb-10 md:pb-16">
   <div class="main-container relative z-30 text-center">
-    <h1 class="text-white font-medium mb-3 text-heading-4 sm:text-heading-3 md:text-heading-3 leading-[1.1] max-w-[680px] mx-auto">You have been given access</h1>
-    <p class="cfg-sub max-w-[560px] mx-auto text-tagline-1 font-light">Open the invitation in the app: the key is created on your phone and works only there.</p>
+    <h1 class="text-white font-medium mb-3 text-heading-4 sm:text-heading-3 md:text-heading-3 leading-[1.1] max-w-[680px] mx-auto">You have been passed a key</h1>
+    <p class="cfg-sub max-w-[560px] mx-auto text-tagline-1 font-light">Open it in the app: the key is created on your phone and works only there.</p>
   </div>
 </section>
 
 <div class="og-wrap">
   <div class="og-card">
 <?php if ($state === 'new'): ?>
-    <p class="og-sub">The invitation opens <?= $objects === 1 ? 'one entrance' : $objects . ' entrances' ?>. The owner of the barrier sees the whole chain of who passed access to whom, and takes it back in one tap — together with everything granted further down.</p>
+    <p class="og-sub">Objects in the key: <strong><?= (int)$objects ?></strong></p>
+    <p class="og-sub">The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.</p>
     <ol class="og-steps">
       <li>Install the app if you do not have it yet.</li>
-      <li>Open the invitation: your phone creates the key itself, nothing is copied or forwarded.</li>
-      <li>The barrier appears in your list as soon as the owner confirms the key.</li>
+      <li>Open the key in the app: your phone creates it itself, nothing is copied or forwarded.</li>
+      <li>The objects appear in your list as soon as the owner confirms the key.</li>
     </ol>
     <a class="og-btn" id="og-open" href="entrixy://invite?code=<?= rawurlencode($code) ?>&amp;h=<?= rawurlencode(site_host()) ?>">Open in the app</a>
     <script <?= csp_nonce_attr() ?>>
@@ -75,15 +76,15 @@ require __DIR__ . '/partials/head.php';
     </script>
     <a class="og-btn ghost" href="https://entrixy.com/download/android">Install the app</a>
     <?php if ($depth > 0): ?>
-    <div class="og-note">You may pass this access on <?= $depth === 1 ? 'one step further' : $depth . ' steps further' ?>. Everyone you give it to stays visible to the owner by name.</div>
+    <div class="og-note">You may pass this key on to others.</div>
     <?php else: ?>
-    <div class="og-note">This access is for you alone: it cannot be passed on any further.</div>
+    <div class="og-note">This key is for you alone: it cannot be passed on.</div>
     <?php endif; ?>
 <?php elseif ($state === 'redeemed'): ?>
-    <p class="og-sub">This invitation has already been used. If the key is not on your phone, ask for a new invitation — it takes one tap.</p>
+    <p class="og-sub">This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.</p>
     <a class="og-btn" href="entrixy://guests">Open in the app</a>
 <?php elseif ($state === 'expired' || $state === 'cancelled'): ?>
-    <p class="og-sub">The invitation is no longer valid. Ask for a new link from whoever sent you this one.</p>
+    <p class="og-sub">This key is no longer valid. Ask whoever sent it for a new link.</p>
 <?php else: ?>
     <p class="og-sub">This link is not valid. Check that the address was copied in full, or ask for a new one.</p>
 <?php endif; ?>
