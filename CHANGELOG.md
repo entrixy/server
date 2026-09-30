@@ -5,6 +5,11 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**A received key moves with a backup.** `key_bind.php` with `move: 1`,
+signed with the pair of the handset the key sat on, moves the key to the new
+handset (same window between moves as for an owner); the previous handset is
+told the key is gone. Nothing changes in the database.
+
 **Access is set per object in a key.** Each object carries three settings:
 "app only", how many levels it may be passed on, and how many keys with it
 may be issued in all down the chain below (3 by default). A guest passing a

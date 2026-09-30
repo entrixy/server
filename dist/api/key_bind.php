@@ -54,6 +54,11 @@ if (!(int)$row['enabled']) jout(['error' => 'disabled'], 403);
 
 $current = $row['bound_device_fp'] ?? null;
 $kid = (int)$row['id'];
+// Moving to a new handset from a backup: the request is signed with the pair of
+// the handset the key sat on, so it comes from whoever holds that key and that
+// handset's backup, not from a copy of the link. The same window between moves
+// applies as for an owner.
+$want_move = !empty($j['move']) && $via === 'device';
 $d = device_move_decide($current, $device_fp, $row['moved_at'] ?? null, $row['prev_device_fp'] ?? null);
 
 /** Remember the device's own pair, once, at the moment it settles here. */
@@ -81,6 +86,18 @@ switch ($d['action']) {
         // keeps it. Whoever arrives second is told so plainly, and the owner
         // issues them a key of their own. Letting the second device take over
         // would mean a copy of the link is enough to walk in.
+        if (!$want_move) jout(['error' => 'already_bound'], 403);
+        device_move_apply('user_keys', $kid, $device_fp, $current);
+        db()->prepare('UPDATE user_keys SET sign_pub_device = ? WHERE id = ?')->execute([$device_pub, $kid]);
+        // The previous handset loses the key at once: its live connection is
+        // told the key is gone, and on reconnecting it is refused as bound
+        // elsewhere.
+        db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())')
+            ->execute(['key_revoked', $kid]);
+        jout(['ok' => 1, 'bound' => 'moved', 'device_key' => $device_pub !== null]);
+
+    case 'wait':
+        if ($want_move) jout(['error' => 'move_too_soon', 'retry_after' => (int)($d['retry_after'] ?? 0)], 429);
         jout(['error' => 'already_bound'], 403);
 
     case 'evicted':
