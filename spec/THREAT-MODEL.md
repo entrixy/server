@@ -29,7 +29,10 @@ new phone.
 
 **Not defended.** The operator sees the shape of the traffic: which key
 fingerprint opened which object id, at what time, from which network. That is
-routing, and routing is the server's job. They also see webhook addresses when
+routing, and routing is the server's job. A controller that works over the
+internet holds its own connection to the server, so the server sees the
+controller's IP address and the time of each command sent to it. The content
+of the commands stays encrypted. They also see webhook addresses when
 the owner asked the server to fire them, and they can refuse service at any
 moment — a server that lies by omission is always possible.
 
