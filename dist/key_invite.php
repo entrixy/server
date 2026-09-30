@@ -12,14 +12,21 @@ $code = substr(preg_replace('/[^A-Za-z0-9_-]/', '', (string)($_GET['code'] ?? ''
 
 $state = 'not_found'; $objects = 0; $depth = 0;
 if ($code !== '') {
-    $st = db()->prepare('SELECT status, number_ids, depth, expires_at FROM key_invites WHERE code = ?');
+    // One link may carry several parts — objects from keys of different owners.
+    // The recipient sees them as one key, so the page sums them up.
+    $st = db()->prepare('SELECT status, number_ids, ble_ids, depth, expires_at FROM key_invites WHERE grp = ?');
     $st->execute([$code]);
-    if ($inv = $st->fetch(PDO::FETCH_ASSOC)) {
-        $state   = $inv['status'];
-        $objects = count(explode(',', $inv['number_ids']));
-        $depth   = (int)$inv['depth'];
-        if ($state === 'new' && strtotime($inv['expires_at']) < time()) $state = 'expired';
+    $seen = [];
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $inv) {
+        $s = $inv['status'];
+        if ($s === 'new' && strtotime($inv['expires_at']) < time()) $s = 'expired';
+        $seen[] = $s;
+        foreach ([$inv['number_ids'], $inv['ble_ids']] as $list) {
+            foreach (explode(',', (string)$list) as $x) if ((int)$x > 0) $objects++;
+        }
+        $depth = max($depth, (int)$inv['depth']);
     }
+    if ($seen) $state = in_array('new', $seen, true) ? 'new' : $seen[0];
 }
 
 $pageTitle     = 'Access invitation — Entrixy';
@@ -59,7 +66,13 @@ require __DIR__ . '/partials/head.php';
       <li>Open the invitation: your phone creates the key itself, nothing is copied or forwarded.</li>
       <li>The barrier appears in your list as soon as the owner confirms the key.</li>
     </ol>
-    <a class="og-btn" href="entrixy://invite?code=<?= rawurlencode($code) ?>">Open in the app</a>
+    <a class="og-btn" id="og-open" href="entrixy://invite?code=<?= rawurlencode($code) ?>&amp;h=<?= rawurlencode(site_host()) ?>">Open in the app</a>
+    <script <?= csp_nonce_attr() ?>>
+      // The key to the first message lives after # and never reaches the server;
+      // the app needs it, so it goes along.
+      (function(){var h=location.hash.slice(1),a=document.getElementById('og-open');
+        if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;})();
+    </script>
     <a class="og-btn ghost" href="https://entrixy.com/download/android">Install the app</a>
     <?php if ($depth > 0): ?>
     <div class="og-note">You may pass this access on <?= $depth === 1 ? 'one step further' : $depth . ' steps further' ?>. Everyone you give it to stays visible to the owner by name.</div>

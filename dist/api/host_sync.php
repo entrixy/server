@@ -44,6 +44,7 @@ $st = db()->prepare(
     'SELECT uk.id, uk.enabled, uk.mode, uk.force_when_busy,
             uk.bundle_cipher, uk.bundle_cipher_updated,
             uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher,
+            uk.native_only, uk.ble_ids, uk.bundle_dirty,
             uk.org_id, o.name AS org_name, o.logo_hash,
             o.domain AS org_domain, o.pubkey AS org_pubkey,
             GROUP_CONCAT(kn.number_id) AS number_ids
@@ -76,7 +77,15 @@ foreach ($keys as &$k) {
     // A key issued down a chain arrives without a bundle: only the owner can
     // assemble it, since only they hold the object keys. Until then the key counts
     // as pending and opens nothing.
-    $k['needs_bundle'] = ($k['parent_key_id'] !== null && $k['bundle_cipher'] === null) ? 1 : 0;
+    // A guest who passed the key on may change its objects later; the old
+    // bundle keeps working until the owner assembles the new one.
+    $k['needs_bundle'] = ($k['parent_key_id'] !== null
+        && ($k['bundle_cipher'] === null || (int)$k['bundle_dirty'])) ? 1 : 0;
+    unset($k['bundle_dirty']);
+    $k['native_only'] = (int)$k['native_only'];
+    // Bluetooth locks chosen by the guest who passed the key on. The owner packs
+    // passes only to locks the parent key holds.
+    $k['ble_ids'] = $k['ble_ids'] ? array_map('intval', explode(',', $k['ble_ids'])) : [];
     // bundle_cipher goes out as it is; the client makes sense of it.
     $k['bundle_cipher_ts'] = $k['bundle_cipher_updated'];
     unset($k['bundle_cipher_updated']);

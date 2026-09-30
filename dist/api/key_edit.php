@@ -8,7 +8,7 @@ $number_ids = $j['number_ids'] ?? [];
 // The label is not stored on the server; the owner keeps it locally.
 if ($id <= 0 || !is_array($number_ids)) jout(['error' => 'bad_input'], 400);
 
-$st = db()->prepare('SELECT id, UNIX_TIMESTAMP(bundle_cipher_updated) AS bct FROM user_keys WHERE id = ? AND host_id = ?');
+$st = db()->prepare('SELECT id, parent_key_id, org_id, ble_ids, UNIX_TIMESTAMP(bundle_cipher_updated) AS bct FROM user_keys WHERE id = ? AND host_id = ?');
 $st->execute([$id, $host_id]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'not_found'], 404);
@@ -29,7 +29,9 @@ if (!empty($number_ids)) {
     $st->execute(array_merge([$host_id], array_map('intval', $number_ids)));
     $valid = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
 }
-if (!$valid) jout(['error' => 'no_numbers'], 400);
+// A key with Bluetooth locks only has no objects on the server at all; a list
+// that names objects none of which are this owner's is still a mistake.
+if (!$valid && !empty($number_ids)) jout(['error' => 'no_numbers'], 400);
 
 // Object names for a company arrive in the clear: the owner decides that the
 // service may see them, as in key_create.
@@ -41,6 +43,21 @@ db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?')->execute([$id]);
 $ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id, org_label) VALUES (?, ?, ?)');
 foreach ($valid as $nid) $ins->execute([$id, $nid, $org_labels[$nid] ?? null]);
 
+// Two settings belong to the owner alone and apply to keys they issued
+// themselves: a company does not pass access on, and a key passed on by a
+// guest inherits both from its parent. Keys already passed on below are left
+// as they are.
+if ($row['parent_key_id'] === null && $row['org_id'] === null) {
+    if (isset($j['native_only'])) {
+        db()->prepare('UPDATE user_keys SET native_only = ? WHERE id = ?')
+            ->execute([(int)(bool)$j['native_only'], $id]);
+    }
+    if (isset($j['delegate_depth'])) {
+        $d = max(0, min(255, (int)$j['delegate_depth']));
+        db()->prepare('UPDATE user_keys SET delegate_depth = ? WHERE id = ?')->execute([$d, $id]);
+    }
+}
+
 if (isset($j['force_when_busy'])) {
     db()->prepare('UPDATE user_keys SET force_when_busy = ? WHERE id = ?')
         ->execute([(int)(bool)$j['force_when_busy'], $id]);
@@ -51,8 +68,13 @@ if (array_key_exists('bundle_cipher', $j)) {
     $b = (string)$j['bundle_cipher'];
     $b = $b === '' ? null : $b;
     if (!is_valid_cipher($b)) jout(['error' => 'invalid_cipher_format'], 400);
-    db()->prepare('UPDATE user_keys SET bundle_cipher = ?, bundle_cipher_updated = NOW() WHERE id = ?')
-        ->execute([$b, $id]);
+    // What the bundle covers from now on: for a key passed on by a guest, the
+    // difference with its current objects shows as "waiting for the owner".
+    $cover = $valid;
+    foreach (explode(',', (string)$row['ble_ids']) as $bid) if ((int)$bid > 0) $cover[] = (int)$bid;
+    db()->prepare('UPDATE user_keys SET bundle_cipher = ?, bundle_cipher_updated = NOW(),
+                          confirmed_ids = ?, bundle_dirty = 0 WHERE id = ?')
+        ->execute([$b, $b === null ? null : implode(',', $cover), $id]);
 }
 
 // The bundle key for a guest further down a chain: encrypted with their public
@@ -70,7 +92,7 @@ db()->prepare(
 
 audit_log($host_id, 'key_edit', 'user_key', $id, [
     'numbers' => $valid,
-    'fields' => array_intersect(array_keys($j), ['force_when_busy', 'bundle_cipher']),
+    'fields' => array_intersect(array_keys($j), ['force_when_busy', 'bundle_cipher', 'native_only', 'delegate_depth']),
 ]);
 
 jout(['ok' => 1]);

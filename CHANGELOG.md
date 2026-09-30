@@ -5,6 +5,42 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-09-30
 
+**A guest passes a key on with one link, even from several owners.** A link
+is a group of parts, one per key the guest passes from; each part is an
+ordinary key on its owner's object, confirmed by that owner. The recipient
+sees one key. The guest can later change the objects of what they passed on,
+revoke it with everything below, and write to the recipient; the message is
+sealed with the recipient's public key. `api/key_delegate.php` gains
+`edit`, `revoke` and `message`, and `create`/`info`/`redeem` work on the
+group. Bluetooth locks travel in a pass-on too: the owner packs a pass only to
+a lock the parent key holds.
+
+**The owner can change "app only" and the pass-on depth of an issued key**
+through `key_edit.php`. Keys already passed on below keep what they had.
+
+**A controller that works over the internet** holds its own connection to the
+server, so the server sees its IP address and the time of each command; the
+content stays encrypted. Said in `spec/THREAT-MODEL.md`.
+
+A running server applies this to its database:
+
+```sql
+ALTER TABLE key_invites
+  ADD COLUMN grp CHAR(22) DEFAULT NULL AFTER code,
+  ADD COLUMN creator_fp VARCHAR(64) DEFAULT NULL AFTER grp,
+  ADD COLUMN ble_ids VARCHAR(255) NOT NULL DEFAULT '' AFTER number_ids,
+  ADD COLUMN welcome_cipher TEXT DEFAULT NULL AFTER ble_ids,
+  ADD KEY grp (grp);
+ALTER TABLE user_keys
+  ADD COLUMN share_grp CHAR(22) DEFAULT NULL AFTER parent_key_id,
+  ADD COLUMN ble_ids VARCHAR(255) DEFAULT NULL AFTER share_grp,
+  ADD COLUMN confirmed_ids VARCHAR(512) DEFAULT NULL AFTER ble_ids,
+  ADD COLUMN bundle_dirty TINYINT(1) NOT NULL DEFAULT 0 AFTER confirmed_ids,
+  ADD KEY share_grp (share_grp);
+```
+
+The service binary does not change for this.
+
 **Only the current connection reports an owner or a controller as gone.** A
 phone that reconnects has two sockets for a moment, and the old one closes
 after the new one has said hello. That close is no longer passed on to guests:

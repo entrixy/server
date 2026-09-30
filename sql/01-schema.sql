@@ -129,7 +129,11 @@ CREATE TABLE `key_invites` (
   `host_id` int(10) unsigned NOT NULL,
   `parent_key_id` int(10) unsigned NOT NULL,
   `code` char(22) NOT NULL,
+  `grp` char(22) DEFAULT NULL,
+  `creator_fp` varchar(64) DEFAULT NULL,
   `number_ids` varchar(255) NOT NULL,
+  `ble_ids` varchar(255) NOT NULL DEFAULT '',
+  `welcome_cipher` text DEFAULT NULL,
   `depth` tinyint(3) unsigned NOT NULL DEFAULT 0,
   `expires_at` datetime NOT NULL,
   `status` enum('new','redeemed','cancelled','expired') NOT NULL DEFAULT 'new',
@@ -139,7 +143,8 @@ CREATE TABLE `key_invites` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `code` (`code`),
   KEY `parent_key_id` (`parent_key_id`),
-  KEY `host_id` (`host_id`)
+  KEY `host_id` (`host_id`),
+  KEY `grp` (`grp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -298,6 +303,10 @@ CREATE TABLE `user_keys` (
   `host_id` int(10) unsigned NOT NULL,
   `org_id` int(10) unsigned DEFAULT NULL,
   `parent_key_id` int(10) unsigned DEFAULT NULL,
+  `share_grp` char(22) DEFAULT NULL,
+  `ble_ids` varchar(255) DEFAULT NULL,
+  `confirmed_ids` varchar(512) DEFAULT NULL,
+  `bundle_dirty` tinyint(1) NOT NULL DEFAULT 0,
   `delegate_depth` tinyint(3) unsigned NOT NULL DEFAULT 0,
   `guest_pub` varchar(128) DEFAULT NULL,
   `key_cipher` varchar(255) DEFAULT NULL,
@@ -322,7 +331,8 @@ CREATE TABLE `user_keys` (
   UNIQUE KEY `key_hash` (`key_hash`),
   KEY `host_id` (`host_id`),
   KEY `org_id` (`org_id`),
-  KEY `parent_key_id` (`parent_key_id`)
+  KEY `parent_key_id` (`parent_key_id`),
+  KEY `share_grp` (`share_grp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
