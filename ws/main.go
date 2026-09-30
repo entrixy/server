@@ -153,11 +153,18 @@ func onClose(c *Conn) {
 	hostID := c.snapHostID()
 	switch role {
 	case "host":
+		// The phone may already be back on a new connection, and this is the
+		// old one timing out. Then the owner is online, and telling guests
+		// otherwise would stick: nothing afterwards says they returned.
 		hub.mu.Lock()
-		if hub.hosts[hostID] == c {
+		current := hub.hosts[hostID] == c
+		if current {
 			delete(hub.hosts, hostID)
 		}
 		hub.mu.Unlock()
+		if !current {
+			return
+		}
 		exec(`UPDATE hosts SET last_seen = NOW() WHERE id = ?`, hostID)
 		now := time.Now().Format("2006-01-02 15:04:05")
 		for _, g := range hub.guestsOfHost(hostID) {
@@ -169,11 +176,17 @@ func onClose(c *Conn) {
 		hub.mu.Unlock()
 	case "device":
 		devID := c.snapDeviceID()
+		// Same as the owner: a controller already back on a new connection
+		// stays online.
 		hub.mu.Lock()
-		if hub.devices[devID] == c {
+		current := hub.devices[devID] == c
+		if current {
 			delete(hub.devices, devID)
 		}
 		hub.mu.Unlock()
+		if !current {
+			return
+		}
 		exec(`UPDATE devices SET last_seen = NOW() WHERE id = ?`, devID)
 		msg, _ := json.Marshal(map[string]any{
 			"type": "device_online", "device_id": devID, "online": false,

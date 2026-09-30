@@ -3,6 +3,19 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-09-30
+
+**Only the current connection reports an owner or a controller as gone.** A
+phone that reconnects has two sockets for a moment, and the old one closes
+after the new one has said hello. That close is no longer passed on to guests:
+the owner stays online for them. The same holds for controllers.
+
+**A guest can ask whether the owner is online.** `host_status_req` answers
+with the same `host_status` a guest receives on connecting. The app asks once
+a minute while the owner shows as offline, so one lost message does not leave
+a card paused for good. Rebuild the service binary to pick this up; nothing
+changes in the database.
+
 ## 2026-09-28
 
 **The service that holds the live connections is a single binary.** Its source

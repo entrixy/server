@@ -109,6 +109,8 @@ func handleMessage(c *Conn, data []byte) {
 		guestHello(c, msg)
 	case "call":
 		guestCall(c, msg)
+	case "host_status_req":
+		guestStatusReq(c)
 	case "host_self_webhook":
 		hostSelfWebhook(c, msg)
 	case "host_self_call":
@@ -183,18 +185,20 @@ func hostHello(c *Conn, msg map[string]any) {
 	c.deviceFP = fp
 	c.mu.Unlock()
 
-	hub.mu.Lock()
-	hub.hosts[id] = c
-	hub.mu.Unlock()
-
 	// Moving to another phone: the new handset took the access and this one is
 	// the old one. We say so here rather than waiting to be asked. An empty
 	// fingerprint belongs to an older client that knows nothing of this.
+	// Checked before registering: the old phone must not take the place of
+	// the new one, even for the moment until it is closed.
 	if fp != "" && boundFP.String != "" && !hmac.Equal([]byte(boundFP.String), []byte(fp)) {
 		log.Printf("evicted on connect: host %d, fingerprint %.10s", id, fp)
 		c.sendThenClose(map[string]any{"type": "evicted"})
 		return
 	}
+
+	hub.mu.Lock()
+	hub.hosts[id] = c
+	hub.mu.Unlock()
 
 	exec(`UPDATE hosts SET last_seen = NOW(),
 	      fcm_token = COALESCE(NULLIF(?, ''), fcm_token) WHERE id = ?`, fcm, id)
@@ -374,6 +378,19 @@ func guestHello(c *Conn, msg map[string]any) {
 
 	c.send(map[string]any{"type": "guest_ok", "numbers": nums, "mode": keyMode})
 
+	c.send(hostStatus(hostID))
+
+	online := []int64{}
+	for _, d := range hub.allDevices() {
+		if d.snapHostID() == hostID {
+			online = append(online, d.snapDeviceID())
+		}
+	}
+	c.send(map[string]any{"type": "devices_online", "device_ids": online})
+}
+
+// Whether the owner is online now, and when last seen if not.
+func hostStatus(hostID int64) map[string]any {
 	hostOnline := hub.host(hostID) != nil
 	status := map[string]any{"type": "host_status", "online": hostOnline}
 	if !hostOnline {
@@ -383,15 +400,16 @@ func guestHello(c *Conn, msg map[string]any) {
 			status["last_seen"] = lastSeen.String
 		}
 	}
-	c.send(status)
+	return status
+}
 
-	online := []int64{}
-	for _, d := range hub.allDevices() {
-		if d.snapHostID() == hostID {
-			online = append(online, d.snapDeviceID())
-		}
+// A guest who has seen the owner offline for a while asks again. The answer
+// is otherwise pushed, and one lost push would leave the guest waiting.
+func guestStatusReq(c *Conn) {
+	if c.snapRole() != "guest" {
+		return
 	}
-	c.send(map[string]any{"type": "devices_online", "device_ids": online})
+	c.send(hostStatus(c.snapHostID()))
 }
 
 // The objects a key opens, as the client expects them: the sensitive part of
