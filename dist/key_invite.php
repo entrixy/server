@@ -14,12 +14,16 @@ $state = 'not_found'; $objects = 0; $depth = 0;
 if ($code !== '') {
     // One link may carry several parts — objects from keys of different owners.
     // The recipient sees them as one key, so the page sums them up.
-    $st = db()->prepare('SELECT status, number_ids, ble_ids, depth, expires_at FROM key_invites WHERE grp = ?');
+    // The link lives until the one who passed it deletes it: an accepted part
+    // whose key is still alive opens again on the same handset.
+    $st = db()->prepare('SELECT k.status, k.number_ids, k.ble_ids, k.depth, uk.id AS alive
+                           FROM key_invites k LEFT JOIN user_keys uk ON uk.id = k.child_key_id
+                          WHERE k.grp = ?');
     $st->execute([$code]);
     $seen = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $inv) {
         $s = $inv['status'];
-        if ($s === 'new' && strtotime($inv['expires_at']) < time()) $s = 'expired';
+        if ($s === 'redeemed') $s = $inv['alive'] ? 'new' : 'cancelled';
         $seen[] = $s;
         foreach ([$inv['number_ids'], $inv['ble_ids']] as $list) {
             foreach (explode(',', (string)$list) as $x) if ((int)$x > 0) $objects++;
@@ -80,9 +84,6 @@ require __DIR__ . '/partials/head.php';
     <?php else: ?>
     <div class="og-note">This key is for you alone: it cannot be passed on.</div>
     <?php endif; ?>
-<?php elseif ($state === 'redeemed'): ?>
-    <p class="og-sub">This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.</p>
-    <a class="og-btn" href="entrixy://guests">Open in the app</a>
 <?php elseif ($state === 'expired' || $state === 'cancelled'): ?>
     <p class="og-sub">This key is no longer valid. Ask whoever sent it for a new link.</p>
 <?php else: ?>

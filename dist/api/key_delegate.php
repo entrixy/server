@@ -202,16 +202,22 @@ if ($action === 'info') {
     $parts = [];
     $welcome = null;
     $open = 0;
+    // The link lives until the one who passed it deletes it. An accepted part
+    // whose key is still alive can be opened again on the same handset.
+    $alive = db()->prepare('SELECT 1 FROM user_keys WHERE id = ?');
     foreach ($rows as $inv) {
         $state = $inv['status'];
-        if ($state === 'new' && strtotime($inv['expires_at']) < time()) $state = 'expired';
-        if ($state === 'new') $open++;
+        if ($state === 'redeemed') {
+            $alive->execute([(int)$inv['child_key_id']]);
+            if (!$alive->fetchColumn()) $state = 'cancelled';
+        }
+        if ($state === 'new' || $state === 'redeemed') $open++;
         if ($welcome === null && $inv['welcome_cipher']) $welcome = $inv['welcome_cipher'];
         $parts[] = ['code' => $inv['code'], 'state' => $state,
                     'objects' => count(csv_ids($inv['number_ids'])) + count(csv_ids($inv['ble_ids'])),
                     'depth' => (int)$inv['depth']];
     }
-    jout(['grp' => $grp, 'state' => $open ? 'new' : $parts[0]['state'], 'parts' => $parts,
+    jout(['grp' => $grp, 'state' => $open ? 'new' : 'cancelled', 'parts' => $parts,
           'welcome_cipher' => $welcome]);
 }
 
@@ -221,6 +227,9 @@ if ($action === 'redeem') {
     // One encryption pair for the whole key: every owner seals their bundle key
     // with its public half, so neither the server nor the holder can read them.
     $guest_pub = (string)($j['guest_pub'] ?? '');
+    // The handset opening the link: an accepted part moves to a new key only
+    // on the handset it was bound to.
+    $fp = (string)($j['device_fp'] ?? '');
     $parts_in = is_array($j['parts'] ?? null) ? $j['parts'] : [];
     if ($grp === '' || !$parts_in) jout(['error' => 'bad_input'], 400);
     if (!preg_match('/^[A-Za-z0-9_-]{40,120}$/', $guest_pub)) jout(['error' => 'bad_pubkey'], 400);
@@ -245,11 +254,32 @@ if ($action === 'redeem') {
         }
         $st->execute([$code, $grp]);
         $inv = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$inv || $inv['status'] !== 'new') { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
-        if (strtotime($inv['expires_at']) < time()) {
-            db()->prepare('UPDATE key_invites SET status = "expired" WHERE id = ?')->execute([(int)$inv['id']]);
-            $out[] = ['code' => $code, 'error' => 'expired']; continue;
+        if (!$inv) { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
+        $chk->execute([$key_hash]);
+        if ($chk->fetch()) { $out[] = ['code' => $code, 'error' => 'user_key_collision']; continue; }
+
+        // Opened again: the recipient removed the key and opens the same link.
+        // The secret was born on their handset and is gone, so the part takes
+        // the new key in place of the old one — on the same handset only. The
+        // owner seals the bundle once more, for the new pair.
+        if ($inv['status'] === 'redeemed') {
+            $c = db()->prepare('SELECT id, host_id, parent_key_id, bound_device_fp, ble_ids FROM user_keys WHERE id = ?');
+            $c->execute([(int)$inv['child_key_id']]);
+            $child = $c->fetch(PDO::FETCH_ASSOC);
+            if (!$child) { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
+            if ($child['bound_device_fp'] && ($fp === '' || !hash_equals($child['bound_device_fp'], $fp))) {
+                $out[] = ['code' => $code, 'error' => 'already_bound']; continue;
+            }
+            db()->prepare(
+                'UPDATE user_keys SET key_hash = ?, sign_pub = ?, sign_suite = ?, sign_pub_device = NULL,
+                                      guest_pub = ?, key_cipher = NULL, bundle_dirty = 1 WHERE id = ?'
+            )->execute([$key_hash, $sign_pub, $suite, $guest_pub, (int)$child['id']]);
+            ask_owner((int)$child['host_id'], (int)$child['id'], (int)$child['parent_key_id'],
+                      key_numbers((int)$child['id']), csv_ids($child['ble_ids']));
+            $out[] = ['code' => $code, 'id' => (int)$child['id'], 'key_hash' => $key_hash, 'again' => 1];
+            continue;
         }
+        if ($inv['status'] !== 'new') { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
         // Is the parent still alive?
         $par->execute([(int)$inv['parent_key_id']]);
         $pk = $par->fetch(PDO::FETCH_ASSOC);
@@ -257,9 +287,6 @@ if ($action === 'redeem') {
             || ($pk['expires_at'] && strtotime($pk['expires_at']) < time())) {
             $out[] = ['code' => $code, 'error' => 'parent_revoked']; continue;
         }
-        $chk->execute([$key_hash]);
-        if ($chk->fetch()) { $out[] = ['code' => $code, 'error' => 'user_key_collision']; continue; }
-
         // The child key is enabled but carries NO bundle: until the owner
         // assembles one it opens nothing. Lifetime and the "app only" mode are
         // inherited from the parent: nobody can pass on more than they hold.
@@ -310,7 +337,6 @@ if ($action === 'list') {
     $st->execute([(int)$k['id']]);
     $inv = $st->fetchAll(PDO::FETCH_ASSOC);
     foreach ($inv as &$i) {
-        if ($i['status'] === 'new' && strtotime($i['expires_at']) < time()) $i['status'] = 'expired';
         $i['number_ids'] = csv_ids($i['number_ids']);
         $i['ble_ids'] = csv_ids($i['ble_ids']);
     }

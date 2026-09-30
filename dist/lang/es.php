@@ -75,7 +75,6 @@ Content-Type: application/json
     'The objects appear in your list as soon as the owner confirms the key.' => 'Los objetos aparecerán en su lista en cuanto el propietario confirme la llave.',
     'You may pass this key on to others.' => 'Puede pasar esta llave a otras personas.',
     'This key is for you alone: it cannot be passed on.' => 'Esta llave es solo para usted: no se puede pasar a nadie más.',
-    'This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.' => 'Esta llave ya se aceptó. Si no está en su teléfono, pida una nueva a quien se la envió.',
     'This key is no longer valid. Ask whoever sent it for a new link.' => 'Esta llave ya no es válida. Pida un enlace nuevo a quien se la envió.',
     'This link is not valid. Check that the address was copied in full, or ask for a new one.' => 'Este enlace no es válido. Compruebe que la dirección se copió completa o pida uno nuevo.',
     'with its own' => 'con su propia',

@@ -15,6 +15,11 @@ sealed with the recipient's public key. `api/key_delegate.php` gains
 group. Bluetooth locks travel in a pass-on too: the owner packs a pass only to
 a lock the parent key holds.
 
+**A passed-on link lives until the one who passed it deletes it.** A
+recipient who removed the key opens the same link again, on the same handset
+only: the part takes the new key and waits for the owner to seal the bundle
+once more. Another handset is refused as "already bound".
+
 **The owner can change "app only" and the pass-on depth of an issued key**
 through `key_edit.php`. Keys already passed on below keep what they had.
 

@@ -75,7 +75,6 @@ Content-Type: application/json
     'The objects appear in your list as soon as the owner confirms the key.' => 'Die Objekte erscheinen in Ihrer Liste, sobald der Eigentümer den Schlüssel bestätigt.',
     'You may pass this key on to others.' => 'Diesen Schlüssel können Sie an andere weitergeben.',
     'This key is for you alone: it cannot be passed on.' => 'Dieser Schlüssel gilt nur für Sie: Er lässt sich nicht weitergeben.',
-    'This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.' => 'Dieser Schlüssel wurde bereits angenommen. Wenn er nicht auf Ihrem Telefon ist, bitten Sie die Person, die ihn geschickt hat, um einen neuen.',
     'This key is no longer valid. Ask whoever sent it for a new link.' => 'Dieser Schlüssel gilt nicht mehr. Bitten Sie die Person, die ihn geschickt hat, um einen neuen Link.',
     'This link is not valid. Check that the address was copied in full, or ask for a new one.' => 'Dieser Link ist ungültig. Prüfen Sie, ob die Adresse vollständig kopiert wurde, oder bitten Sie um einen neuen.',
     'with its own' => 'mit seinem eigenen',

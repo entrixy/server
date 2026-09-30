@@ -75,7 +75,6 @@ Content-Type: application/json
     'The objects appear in your list as soon as the owner confirms the key.' => 'Объекты появятся в списке, как только владелец подтвердит ключ.',
     'You may pass this key on to others.' => 'Этот ключ можно передать другим.',
     'This key is for you alone: it cannot be passed on.' => 'Этот ключ только для вас: передать его дальше нельзя.',
-    'This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.' => 'Этот ключ уже принят. Если на вашем телефоне его нет, попросите новый у того, кто его прислал.',
     'This key is no longer valid. Ask whoever sent it for a new link.' => 'Ключ больше не действует. Попросите новую ссылку у того, кто её прислал.',
     'This link is not valid. Check that the address was copied in full, or ask for a new one.' => 'Ссылка недействительна. Проверьте, что адрес скопирован целиком, или попросите новую.',
     'with its own' => 'своим',

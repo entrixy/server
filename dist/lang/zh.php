@@ -75,7 +75,6 @@ Content-Type: application/json
     'The objects appear in your list as soon as the owner confirms the key.' => '所有者确认钥匙后，对象就会出现在您的列表中。',
     'You may pass this key on to others.' => '您可以把这把钥匙转交给他人。',
     'This key is for you alone: it cannot be passed on.' => '这把钥匙只属于您：不能再转交。',
-    'This key has already been accepted. If it is not on your phone, ask whoever sent it for a new one.' => '这把钥匙已被接收。如果它不在您的手机上，请向发送者索要一把新的。',
     'This key is no longer valid. Ask whoever sent it for a new link.' => '这把钥匙已失效。请向发送者索要新的链接。',
     'This link is not valid. Check that the address was copied in full, or ask for a new one.' => '链接无效。请检查地址是否完整复制，或索要新的链接。',
     'with its own' => '用它自己的',
