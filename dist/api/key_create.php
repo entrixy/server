@@ -4,6 +4,7 @@ rate_limit_check('key_create', 30);
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/org.php';
 require_once __DIR__ . '/../lib/guest_auth.php';   // the company callback
+require_once __DIR__ . '/../lib/key_objects.php';
 [$host_id, $j] = host_auth();
 
 // The guest's name is not stored in the database. The owner keeps it
@@ -14,6 +15,10 @@ require_once __DIR__ . '/../lib/guest_auth.php';   // the company callback
 // required.
 $number_ids = $j['number_ids'] ?? [];
 if (!is_array($number_ids)) jout(['error' => 'bad_input'], 400);
+// Bluetooth locks are objects of this server as well: they go into the key's
+// list with their own settings, the live connection simply does not show them.
+$number_ids = array_values(array_unique(array_merge(
+    array_map('intval', $number_ids), array_map('intval', (array)($j['ble_ids'] ?? [])))));
 $bundle_cipher_for_check = (string)($j['bundle_cipher'] ?? '');
 if (!$number_ids && $bundle_cipher_for_check === '') {
     jout(['error' => 'bad_input'], 400);
@@ -134,7 +139,7 @@ if ($org_id !== null) {
             foreach ($j['org_labels'] as $nid => $label) $lbl[(int)$nid] = mb_substr(trim((string)$label), 0, 64);
         }
         $ins = db()->prepare(
-            'INSERT INTO key_numbers (user_key_id, number_id, org_label) VALUES (?, ?, ?)
+            'INSERT INTO key_numbers (user_key_id, number_id, org_label, delegate_depth) VALUES (?, ?, ?, 0)
              ON DUPLICATE KEY UPDATE org_label = VALUES(org_label)'
         );
         foreach ($valid as $nid) $ins->execute([$existing, $nid, $lbl[$nid] ?? null]);
@@ -191,8 +196,13 @@ if ($org_id !== null && is_array($j['org_labels'] ?? null)) {
         $org_labels[(int)$nid] = mb_substr(trim((string)$label), 0, 64);
     }
 }
-$ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id, org_label) VALUES (?, ?, ?)');
-foreach ($valid as $nid) $ins->execute([$key_id, $nid, $org_labels[$nid] ?? null]);
+// Settings of each object: "app only", pass-on levels, keys in all. A company
+// does not pass access on. Without a list, the key-wide fields of an older app
+// apply to every object.
+$defaults = ['n' => $native_only, 'd' => $depth, 'p' => KEY_OBJ_DEFAULTS['p']];
+$settings = key_obj_settings_in($org_id !== null ? [] : $j, $valid, $defaults);
+if ($org_id !== null) foreach ($settings as &$s0) { $s0['d'] = 0; $s0['n'] = 0; } unset($s0);
+key_obj_write($key_id, $settings, $org_labels);
 
 // The company learns that access was granted; it fetches the details itself with a=status.
 if ($org_id !== null) {

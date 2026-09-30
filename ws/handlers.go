@@ -333,19 +333,19 @@ func guestHello(c *Conn, msg map[string]any) {
 		}
 	}
 
-	// A key for the app only. The app signs its greeting with an attestation the
-	// browser client cannot produce.
-	if nativeOnly.Int64 == 1 {
-		attestTS := num(msg, "attest_ts")
-		attest := str(msg, "attest")
-		mac := hmac.New(sha256.New, []byte(cfg.AttestSecret))
-		fmt.Fprintf(mac, "%s|%d", hash, attestTS)
-		expect := hex.EncodeToString(mac.Sum(nil))
-		if attestTS <= 0 || abs64(time.Now().Unix()-attestTS) > 120 || attest == "" ||
-			!hmac.Equal([]byte(expect), []byte(attest)) {
-			c.sendThenClose(map[string]any{"type": "error", "reason": "native_only"})
-			return
-		}
+	// The app signs its greeting with an attestation the browser client cannot
+	// produce. "App only" is set per object: a browser sees only the others,
+	// and a key whose every object is "app only" does not let it in at all.
+	attestTS := num(msg, "attest_ts")
+	attest := str(msg, "attest")
+	mac := hmac.New(sha256.New, []byte(cfg.AttestSecret))
+	fmt.Fprintf(mac, "%s|%d", hash, attestTS)
+	expect := hex.EncodeToString(mac.Sum(nil))
+	appClient := attestTS > 0 && abs64(time.Now().Unix()-attestTS) <= 120 && attest != "" &&
+		hmac.Equal([]byte(expect), []byte(attest))
+	if nativeOnly.Int64 == 1 && !appClient {
+		c.sendThenClose(map[string]any{"type": "error", "reason": "native_only"})
+		return
 	}
 
 	// The key belongs to one handset. Nothing bound yet means the first one to
@@ -360,7 +360,7 @@ func guestHello(c *Conn, msg map[string]any) {
 		return
 	}
 
-	nums := keyNumbers(ukID)
+	nums := keyNumbers(ukID, appClient)
 
 	keyMode := mode.String
 	if keyMode == "" {
@@ -371,6 +371,7 @@ func guestHello(c *Conn, msg map[string]any) {
 	c.userKeyID = ukID
 	c.hostID = hostID
 	c.keyMode = keyMode
+	c.appClient = appClient
 	c.mu.Unlock()
 	hub.mu.Lock()
 	hub.guests[c.id] = c
@@ -414,10 +415,18 @@ func guestStatusReq(c *Conn) {
 
 // The objects a key opens, as the client expects them: the sensitive part of
 // every object travels inside data_cipher, which the server cannot read.
-func keyNumbers(userKeyID int64) []map[string]any {
+//
+// Bluetooth locks are in the key's list too but not here: a lock travels inside
+// the bundle. An "app only" object is left out for a browser client.
+func keyNumbers(userKeyID int64, app bool) []map[string]any {
+	appOnly := 0
+	if app {
+		appOnly = 1
+	}
 	rows, ok := query(`SELECT n.id, n.type, n.device_id, n.data_cipher
 	                   FROM key_numbers kn JOIN numbers n ON n.id = kn.number_id
-	                   WHERE kn.user_key_id = ?`, userKeyID)
+	                   WHERE kn.user_key_id = ? AND n.type <> 'ble' AND kn.native_only <= ?`,
+		userKeyID, appOnly)
 	if !ok {
 		return []map[string]any{}
 	}

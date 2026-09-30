@@ -27,10 +27,10 @@ require __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../lib/guest_auth.php';
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/key_tree.php';
+require_once __DIR__ . '/../lib/key_objects.php';
 require_once __DIR__ . '/../lib/fcm.php';
 
-const DELEGATE_MAX_CHILDREN = 5;    // how many children one key may have
-const DELEGATE_INVITE_HOURS = 72;   // how long a link lives
+const DELEGATE_INVITE_HOURS = 720; // a formality: a link lives until it is deleted
 
 $action = (string)($_GET['a'] ?? '');
 $j = jin();
@@ -87,6 +87,57 @@ function own_child(int $parentId, int $childId): array {
     return $c;
 }
 
+/**
+ * What the holder passes on and with what settings. Each object is checked
+ * against the holder's own key: it must be there, allowed further down
+ * (levels left) and still have keys to spare in the chain above. Levels and
+ * the number of keys for the recipient stay within what came from above; "app
+ * only" is inherited. Returns id → [n, d, p]; objects that may not be passed
+ * are dropped.
+ */
+function pass_objects(array $k, array $j, ?int $skipChild = null, ?int $skipInvite = null, array $keep = []): array {
+    $mine = key_obj_read((int)$k['id']);
+    $req = [];
+    foreach ((array)($j['objects'] ?? []) as $o) {
+        if (is_array($o) && (int)($o['id'] ?? 0) > 0) $req[(int)$o['id']] = $o;
+    }
+    foreach (array_merge(int_ids($j['number_ids'] ?? []), int_ids($j['ble_ids'] ?? [])) as $id) {
+        if (!isset($req[$id])) $req[$id] = ['id' => $id];
+    }
+    $out = [];
+    foreach ($req as $id => $o) {
+        $m = $mine[$id] ?? null;
+        if (!$m || $m['d'] < 1) continue;
+        // Already in the recipient's key: keeps its settings and its place.
+        if (isset($keep[$id]) && !array_key_exists('depth', $o) && !array_key_exists('pool', $o)) {
+            $out[$id] = $keep[$id]; continue;
+        }
+        // The recipient's own key is left out of the count ($skipChild), so
+        // an object it already holds is weighed as if placed anew.
+        $left = key_pool_left((int)$k['id'], $id, $skipChild, $skipInvite);
+        if ($left < 1) continue;
+        $maxD = $m['d'] - 1;
+        $maxP = max(1, $left - 1);   // the recipient's own key takes one place
+        $out[$id] = [
+            'n' => $m['n'],
+            'd' => max(0, min($maxD, (int)($o['depth'] ?? $maxD))),
+            'p' => max(1, min($maxP, (int)($o['pool'] ?? min(KEY_OBJ_DEFAULTS['p'], $maxP)))),
+        ];
+    }
+    return $out;
+}
+
+/** Numbers and Bluetooth locks of a set of objects, apart. */
+function split_types(array $ids): array {
+    if (!$ids) return [[], []];
+    $in = implode(',', array_map('intval', $ids));
+    $nums = []; $bles = [];
+    foreach (db()->query("SELECT id, type FROM numbers WHERE id IN ($in)")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if ($r['type'] === 'ble') $bles[] = (int)$r['id']; else $nums[] = (int)$r['id'];
+    }
+    return [$nums, $bles];
+}
+
 /** Ask the owner to assemble the child's bundle, and tell them about it. */
 function ask_owner(int $hostId, int $childId, int $parentId, array $numbers, array $bles): void {
     db()->prepare(
@@ -109,24 +160,36 @@ if ($action === 'create') {
     $depth = (int)$k['delegate_depth'];
     if ($depth < 1) jout(['error' => 'not_allowed'], 403);
 
-    // Children count against the parent's own allowance: a guest must not eat up
-    // the owner's whole supply of keys.
-    $cnt = db()->prepare('SELECT COUNT(*) FROM user_keys WHERE parent_key_id = ?');
-    $cnt->execute([(int)$k['id']]);
-    if ((int)$cnt->fetchColumn() >= DELEGATE_MAX_CHILDREN) {
-        jout(['error' => 'children_limit', 'limit' => DELEGATE_MAX_CHILDREN], 403);
-    }
-    // And against the owner's overall limit — the key is theirs after all.
+    // Against the owner's overall limit — the key is theirs after all. How
+    // many keys the chain may issue is counted per object, below.
     $max = account_limits((int)$k['host_id'])['max_keys'];
     $have = db()->prepare('SELECT COUNT(*) FROM user_keys WHERE host_id = ? AND enabled = 1');
     $have->execute([(int)$k['host_id']]);
     if ((int)$have->fetchColumn() >= $max) jout(['error' => 'owner_limit_reached'], 403);
 
-    // Objects: only those the holder has. Bluetooth locks are not listed on
-    // the server; the owner checks them when assembling the bundle.
-    $ids  = array_values(array_intersect(int_ids($j['number_ids'] ?? []), key_numbers((int)$k['id'])));
-    $bles = int_ids($j['ble_ids'] ?? []);
-    if (!$ids && !$bles) jout(['error' => 'bad_numbers'], 400);
+    // Objects and their settings; the chain may have run out of keys for some.
+    $grp0 = (string)($j['grp'] ?? '');
+    $prev = null;
+    if ($grp0 !== '') {
+        $pv = db()->prepare('SELECT id FROM key_invites WHERE grp = ? AND parent_key_id = ? AND status = "new"');
+        $pv->execute([$grp0, (int)$k['id']]);
+        $prev = (int)$pv->fetchColumn() ?: null;
+    }
+    $sets = pass_objects($k, $j, null, $prev);
+    if (!$sets) {
+        // Why nothing is left: the objects are not the holder's, may not be
+        // passed on, or the chain has run out of keys for them.
+        $mine = key_obj_read((int)$k['id']);
+        $asked = array_merge(array_map(fn($o) => (int)($o['id'] ?? 0), (array)($j['objects'] ?? [])),
+                             int_ids($j['number_ids'] ?? []), int_ids($j['ble_ids'] ?? []));
+        $held = array_filter($asked, fn($id) => isset($mine[$id]));
+        $err = !$held ? 'bad_numbers'
+             : (!array_filter($held, fn($id) => $mine[$id]['d'] >= 1) ? 'not_allowed' : 'pool_exhausted');
+        jout(['error' => $err], $err === 'bad_numbers' ? 400 : 403);
+    }
+    [$ids, $bles] = split_types(array_keys($sets));
+    $objJson = json_encode(array_map(fn($id) => ['id' => $id] + $sets[$id], array_keys($sets)));
+    $partDepth = max(array_column($sets, 'd'));
 
     $hours = (int)($j['ttl_hours'] ?? DELEGATE_INVITE_HOURS);
     if ($hours < 1 || $hours > 720) $hours = DELEGATE_INVITE_HOURS;
@@ -155,9 +218,9 @@ if ($action === 'create') {
     $ex = db()->prepare('SELECT id, code FROM key_invites WHERE grp = ? AND parent_key_id = ? AND status = "new"');
     $ex->execute([$grp, (int)$k['id']]);
     if ($row = $ex->fetch(PDO::FETCH_ASSOC)) {
-        db()->prepare('UPDATE key_invites SET number_ids = ?, ble_ids = ?, depth = ?,
+        db()->prepare('UPDATE key_invites SET number_ids = ?, ble_ids = ?, objects = ?, depth = ?,
                               expires_at = DATE_ADD(NOW(), INTERVAL ? HOUR) WHERE id = ?')
-            ->execute([implode(',', $ids), implode(',', $bles), $depth - 1, $hours, (int)$row['id']]);
+            ->execute([implode(',', $ids), implode(',', $bles), $objJson, $partDepth, $hours, (int)$row['id']]);
         $code = $row['code'];
     } else {
         $code = null;
@@ -166,10 +229,10 @@ if ($action === 'create') {
             try {
                 db()->prepare(
                     'INSERT INTO key_invites (host_id, parent_key_id, code, grp, creator_fp, number_ids, ble_ids,
-                                              welcome_cipher, depth, expires_at, created_at)
-                     VALUES (?,?,?,?,?,?,?,?,?, DATE_ADD(NOW(), INTERVAL ? HOUR), NOW())'
+                                              objects, welcome_cipher, depth, expires_at, created_at)
+                     VALUES (?,?,?,?,?,?,?,?,?,?, DATE_ADD(NOW(), INTERVAL ? HOUR), NOW())'
                 )->execute([(int)$k['host_id'], (int)$k['id'], $c, $grp, $k['fp'] ?: null,
-                            implode(',', $ids), implode(',', $bles), $welcome ?: null, $depth - 1, $hours]);
+                            implode(',', $ids), implode(',', $bles), $objJson, $welcome ?: null, $partDepth, $hours]);
                 $code = $c;
             } catch (\Throwable $e) { /* code collision */ }
         }
@@ -187,7 +250,7 @@ if ($action === 'create') {
     }
 
     jout(['code' => $code, 'grp' => $grp, 'url' => site_url('/i/' . $grp),
-          'objects' => count($ids) + count($bles), 'depth' => $depth - 1, 'expires_in_hours' => $hours]);
+          'objects' => count($ids) + count($bles), 'depth' => $partDepth]);
 }
 
 // ── What a link offers ──────────────────────────────────────────────────────────
@@ -263,7 +326,7 @@ if ($action === 'redeem') {
         // the new key in place of the old one — on the same handset only. The
         // owner seals the bundle once more, for the new pair.
         if ($inv['status'] === 'redeemed') {
-            $c = db()->prepare('SELECT id, host_id, parent_key_id, bound_device_fp, ble_ids FROM user_keys WHERE id = ?');
+            $c = db()->prepare('SELECT id, host_id, parent_key_id, bound_device_fp FROM user_keys WHERE id = ?');
             $c->execute([(int)$inv['child_key_id']]);
             $child = $c->fetch(PDO::FETCH_ASSOC);
             if (!$child) { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
@@ -274,8 +337,8 @@ if ($action === 'redeem') {
                 'UPDATE user_keys SET key_hash = ?, sign_pub = ?, sign_suite = ?, sign_pub_device = NULL,
                                       guest_pub = ?, key_cipher = NULL, bundle_dirty = 1 WHERE id = ?'
             )->execute([$key_hash, $sign_pub, $suite, $guest_pub, (int)$child['id']]);
-            ask_owner((int)$child['host_id'], (int)$child['id'], (int)$child['parent_key_id'],
-                      key_numbers((int)$child['id']), csv_ids($child['ble_ids']));
+            [$cn, $cb] = split_types(array_keys(key_obj_read((int)$child['id'])));
+            ask_owner((int)$child['host_id'], (int)$child['id'], (int)$child['parent_key_id'], $cn, $cb);
             $out[] = ['code' => $code, 'id' => (int)$child['id'], 'key_hash' => $key_hash, 'again' => 1];
             continue;
         }
@@ -287,23 +350,30 @@ if ($action === 'redeem') {
             || ($pk['expires_at'] && strtotime($pk['expires_at']) < time())) {
             $out[] = ['code' => $code, 'error' => 'parent_revoked']; continue;
         }
+        // Settings of each object as the holder chose them. The chain may have
+        // run out of keys since the link was made: such objects drop out.
+        $sets = [];
+        foreach ((array)json_decode((string)$inv['objects'], true) as $o) {
+            $id = (int)($o['id'] ?? 0);
+            if ($id > 0 && key_pool_left((int)$inv['parent_key_id'], $id, null, (int)$inv['id']) >= 1) {
+                $sets[$id] = ['n' => (int)$o['n'], 'd' => (int)$o['d'], 'p' => (int)$o['p']];
+            }
+        }
+        if (!$sets) { $out[] = ['code' => $code, 'error' => 'pool_exhausted']; continue; }
         // The child key is enabled but carries NO bundle: until the owner
-        // assembles one it opens nothing. Lifetime and the "app only" mode are
-        // inherited from the parent: nobody can pass on more than they hold.
+        // assembles one it opens nothing. Lifetime is inherited from the parent.
         db()->prepare(
-            'INSERT INTO user_keys (host_id, parent_key_id, share_grp, ble_ids, delegate_depth, guest_pub, key_hash,
-                                    sign_pub, sign_suite, enabled, mode, native_only, expires_at, created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,1,"auto",?,?,NOW())'
-        )->execute([(int)$inv['host_id'], (int)$inv['parent_key_id'], $grp, $inv['ble_ids'] ?: null,
-                    (int)$inv['depth'], $guest_pub, $key_hash, $sign_pub, $suite,
-                    (int)$pk['native_only'], $pk['expires_at']]);
+            'INSERT INTO user_keys (host_id, parent_key_id, share_grp, guest_pub, key_hash,
+                                    sign_pub, sign_suite, enabled, mode, expires_at, created_at)
+             VALUES (?,?,?,?,?,?,?,1,"auto",?,NOW())'
+        )->execute([(int)$inv['host_id'], (int)$inv['parent_key_id'], $grp, $guest_pub, $key_hash,
+                    $sign_pub, $suite, $pk['expires_at']]);
         $childId = (int)db()->lastInsertId();
-        $ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id) VALUES (?,?)');
-        foreach (csv_ids($inv['number_ids']) as $nid) $ins->execute([$childId, $nid]);
+        key_obj_write($childId, $sets);
         db()->prepare('UPDATE key_invites SET status="redeemed", child_key_id=?, redeemed_at=NOW() WHERE id=?')
             ->execute([$childId, (int)$inv['id']]);
-        ask_owner((int)$inv['host_id'], $childId, (int)$inv['parent_key_id'],
-                  csv_ids($inv['number_ids']), csv_ids($inv['ble_ids']));
+        [$cn, $cb] = split_types(array_keys($sets));
+        ask_owner((int)$inv['host_id'], $childId, (int)$inv['parent_key_id'], $cn, $cb);
         $out[] = ['code' => $code, 'id' => $childId, 'key_hash' => $key_hash];
     }
     db()->commit();
@@ -331,7 +401,7 @@ if ($action === 'cancel') {
 if ($action === 'list') {
     $k = guest_key_auth($j);
     $st = db()->prepare(
-        'SELECT code, grp, number_ids, ble_ids, depth, status, child_key_id, created_at, expires_at, redeemed_at
+        'SELECT code, grp, number_ids, ble_ids, objects, depth, status, child_key_id, created_at, redeemed_at
          FROM key_invites WHERE parent_key_id = ? ORDER BY id DESC LIMIT 50'
     );
     $st->execute([(int)$k['id']]);
@@ -339,29 +409,40 @@ if ($action === 'list') {
     foreach ($inv as &$i) {
         $i['number_ids'] = csv_ids($i['number_ids']);
         $i['ble_ids'] = csv_ids($i['ble_ids']);
+        $i['objects'] = array_map(fn($o) => ['id' => (int)$o['id'], 'depth' => (int)$o['d'], 'pool' => (int)$o['p']],
+                                  (array)json_decode((string)$i['objects'], true));
     }
     unset($i);
     $ch = db()->prepare(
-        'SELECT uk.id, uk.share_grp, uk.guest_pub, uk.ble_ids, uk.confirmed_ids, uk.bundle_dirty,
-                (uk.bundle_cipher IS NOT NULL) AS has_bundle, uk.created_at,
-                GROUP_CONCAT(kn.number_id) AS number_ids
-         FROM user_keys uk LEFT JOIN key_numbers kn ON kn.user_key_id = uk.id
-         WHERE uk.parent_key_id = ? GROUP BY uk.id ORDER BY uk.id DESC'
+        'SELECT id, share_grp, guest_pub, confirmed_ids, bundle_dirty,
+                (bundle_cipher IS NOT NULL) AS has_bundle, created_at
+         FROM user_keys WHERE parent_key_id = ? ORDER BY id DESC'
     );
     $ch->execute([(int)$k['id']]);
     $children = [];
     foreach ($ch->fetchAll(PDO::FETCH_ASSOC) as $c) {
+        $objs = key_obj_read((int)$c['id']);
+        [$cn, $cb] = split_types(array_keys($objs));
         $children[] = [
             'id' => (int)$c['id'], 'grp' => $c['share_grp'], 'guest_pub' => $c['guest_pub'],
-            'number_ids' => csv_ids($c['number_ids']), 'ble_ids' => csv_ids($c['ble_ids']),
+            'number_ids' => $cn, 'ble_ids' => $cb,
+            'objects' => array_map(fn($id) => ['id' => $id, 'depth' => $objs[$id]['d'], 'pool' => $objs[$id]['p']],
+                                   array_keys($objs)),
             // What the current bundle covers: the rest waits for the owner.
             'confirmed_ids' => csv_ids($c['confirmed_ids']),
             'ready' => ((int)$c['has_bundle'] && !(int)$c['bundle_dirty']) ? 1 : 0,
             'created_at' => $c['created_at'],
         ];
     }
-    jout(['depth' => (int)$k['delegate_depth'], 'invites' => $inv, 'children' => $children,
-          'max_children' => DELEGATE_MAX_CHILDREN]);
+    // What the holder may pass on, object by object: levels below them and
+    // keys left in the chain above.
+    $mine = [];
+    foreach (key_obj_read((int)$k['id']) as $id => $o) {
+        $mine[] = ['id' => $id, 'depth' => $o['d'], 'native_only' => $o['n'],
+                   'pool_left' => $o['d'] >= 1 ? key_pool_left((int)$k['id'], $id) : 0];
+    }
+    jout(['depth' => (int)$k['delegate_depth'], 'objects' => $mine,
+          'invites' => $inv, 'children' => $children]);
 }
 
 // ── Change the objects of a key one passed on ───────────────────────────────────
@@ -369,20 +450,21 @@ if ($action === 'edit') {
     $k = guest_key_auth($j);
     rate_limit_check('key_delegate', 30);
     $c = own_child((int)$k['id'], (int)($j['child_id'] ?? 0));
-    $ids  = array_values(array_intersect(int_ids($j['number_ids'] ?? []), key_numbers((int)$k['id'])));
-    $bles = int_ids($j['ble_ids'] ?? []);
+    // Objects already in the key keep their settings unless new ones came;
+    // added ones are checked like at passing on.
+    $cur = [];
+    foreach (key_obj_read((int)$c['id']) as $id => $o) $cur[$id] = ['n' => $o['n'], 'd' => $o['d'], 'p' => $o['p']];
+    $sets = pass_objects($k, $j, (int)$c['id'], null, $cur);
     // Nothing left: the part goes, together with whatever was passed on below it.
-    if (!$ids && !$bles) {
+    if (!$sets) {
         jout(['ok' => 1, 'revoked' => key_revoke_tree((int)$c['id'])]);
     }
-    db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?')->execute([(int)$c['id']]);
-    $ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id) VALUES (?,?)');
-    foreach ($ids as $nid) $ins->execute([(int)$c['id'], $nid]);
+    key_obj_write((int)$c['id'], $sets);
     // The current bundle stays in place: the recipient keeps opening what was
     // confirmed until the owner assembles the new one.
-    db()->prepare('UPDATE user_keys SET ble_ids = ?, bundle_dirty = 1 WHERE id = ?')
-        ->execute([$bles ? implode(',', $bles) : null, (int)$c['id']]);
-    ask_owner((int)$c['host_id'], (int)$c['id'], (int)$k['id'], $ids, $bles);
+    db()->prepare('UPDATE user_keys SET bundle_dirty = 1 WHERE id = ?')->execute([(int)$c['id']]);
+    [$cn, $cb] = split_types(array_keys($sets));
+    ask_owner((int)$c['host_id'], (int)$c['id'], (int)$k['id'], $cn, $cb);
     db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?,?,NOW())')
         ->execute(['key_updated', (int)$c['id']]);
     jout(['ok' => 1]);

@@ -21,6 +21,9 @@ $st = db()->prepare(
      JOIN key_numbers kn ON kn.user_key_id = uk.id
      WHERE uk.id = ? AND uk.enabled = 1 AND kn.number_id = ?
        AND uk.org_id IS NULL
+       -- An "app only" object opens only through the live connection of the app,
+       -- which proves it is the app; this plain request cannot.
+       AND kn.native_only = 0
        AND (uk.expires_at IS NULL OR uk.expires_at > NOW())'
 );
 $st->execute([(int)$who['id'], $number_id]);

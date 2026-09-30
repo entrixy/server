@@ -3,6 +3,7 @@ require __DIR__ . '/_bootstrap.php';
 rate_limit_check('host_sync', 120);
 require_once __DIR__ . '/../lib/account.php';
 require_once __DIR__ . '/../lib/org.php';
+require_once __DIR__ . '/../lib/key_objects.php';
 
 [$host_id, $j] = host_auth();
 
@@ -83,9 +84,19 @@ foreach ($keys as &$k) {
         && ($k['bundle_cipher'] === null || (int)$k['bundle_dirty'])) ? 1 : 0;
     unset($k['bundle_dirty']);
     $k['native_only'] = (int)$k['native_only'];
-    // Bluetooth locks chosen by the guest who passed the key on. The owner packs
+    // The objects with their settings. Bluetooth locks sit in the same list on
+    // the server but go out apart: the app keeps them apart too. For a key
+    // passed on by a guest these are the locks the guest chose; the owner packs
     // passes only to locks the parent key holds.
+    $objs = key_obj_read((int)$k['id']);
+    $k['number_ids'] = [];
     $k['ble_ids'] = $k['ble_ids'] ? array_map('intval', explode(',', $k['ble_ids'])) : [];
+    $k['objects'] = [];
+    foreach ($objs as $nid => $o) {
+        if ($o['type'] === 'ble') $k['ble_ids'][] = $nid; else $k['number_ids'][] = $nid;
+        $k['objects'][] = ['id' => $nid, 'native_only' => $o['n'], 'depth' => $o['d'], 'pool' => $o['p']];
+    }
+    $k['ble_ids'] = array_values(array_unique($k['ble_ids']));
     // bundle_cipher goes out as it is; the client makes sense of it.
     $k['bundle_cipher_ts'] = $k['bundle_cipher_updated'];
     unset($k['bundle_cipher_updated']);

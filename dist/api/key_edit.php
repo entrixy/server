@@ -5,10 +5,11 @@ rate_limit_check('key_edit', 60);
 
 $id = (int)($j['id'] ?? 0);
 $number_ids = $j['number_ids'] ?? [];
+require_once __DIR__ . '/../lib/key_objects.php';
 // The label is not stored on the server; the owner keeps it locally.
 if ($id <= 0 || !is_array($number_ids)) jout(['error' => 'bad_input'], 400);
 
-$st = db()->prepare('SELECT id, parent_key_id, org_id, ble_ids, UNIX_TIMESTAMP(bundle_cipher_updated) AS bct FROM user_keys WHERE id = ? AND host_id = ?');
+$st = db()->prepare('SELECT id, parent_key_id, org_id, UNIX_TIMESTAMP(bundle_cipher_updated) AS bct FROM user_keys WHERE id = ? AND host_id = ?');
 $st->execute([$id, $host_id]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'not_found'], 404);
@@ -22,6 +23,15 @@ if (array_key_exists('bundle_cipher_ts_check', $j) && array_key_exists('bundle_c
     }
 }
 
+// Bluetooth locks sit in the same list. A call that does not mention them
+// (most rebuilds of a bundle) leaves them as they are.
+$cur = key_obj_read($id);
+$keep_ble = [];
+if (!array_key_exists('ble_ids', $j)) {
+    foreach ($cur as $nid => $o) if ($o['type'] === 'ble') $keep_ble[] = $nid;
+} else {
+    $number_ids = array_merge($number_ids, (array)$j['ble_ids']);
+}
 $valid = [];
 if (!empty($number_ids)) {
     $in = implode(',', array_fill(0, count($number_ids), '?'));
@@ -39,24 +49,25 @@ $org_labels = [];
 if (is_array($j['org_labels'] ?? null)) {
     foreach ($j['org_labels'] as $nid => $label) $org_labels[(int)$nid] = mb_substr(trim((string)$label), 0, 64);
 }
-db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?')->execute([$id]);
-$ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id, org_label) VALUES (?, ?, ?)');
-foreach ($valid as $nid) $ins->execute([$id, $nid, $org_labels[$nid] ?? null]);
+$valid = array_values(array_unique(array_merge($valid, $keep_ble)));
 
-// Two settings belong to the owner alone and apply to keys they issued
+// Settings of each object belong to the owner and only on keys they issued
 // themselves: a company does not pass access on, and a key passed on by a
-// guest inherits both from its parent. Keys already passed on below are left
-// as they are.
-if ($row['parent_key_id'] === null && $row['org_id'] === null) {
-    if (isset($j['native_only'])) {
-        db()->prepare('UPDATE user_keys SET native_only = ? WHERE id = ?')
-            ->execute([(int)(bool)$j['native_only'], $id]);
-    }
-    if (isset($j['delegate_depth'])) {
-        $d = max(0, min(255, (int)$j['delegate_depth']));
-        db()->prepare('UPDATE user_keys SET delegate_depth = ? WHERE id = ?')->execute([$d, $id]);
-    }
+// guest got its settings from that guest. An object that stays keeps what it
+// had unless the request says otherwise; a new one starts from the defaults.
+// Keys already passed on below are left as they are.
+$own = $row['parent_key_id'] === null && $row['org_id'] === null;
+$given = $own ? key_obj_settings_in($j, $valid) : [];
+$listed = [];
+foreach ((array)($j['objects'] ?? []) as $o) if (is_array($o)) $listed[(int)($o['id'] ?? 0)] = true;
+$settings = [];
+foreach ($valid as $nid) {
+    if ($own && isset($listed[$nid])) $settings[$nid] = $given[$nid];
+    elseif (isset($cur[$nid])) $settings[$nid] = ['n' => $cur[$nid]['n'], 'd' => $cur[$nid]['d'], 'p' => $cur[$nid]['p']];
+    else $settings[$nid] = $row['org_id'] !== null ? ['n' => 0, 'd' => 0, 'p' => 1] : KEY_OBJ_DEFAULTS;
+    if (!isset($org_labels[$nid]) && isset($cur[$nid]['org_label'])) $org_labels[$nid] = $cur[$nid]['org_label'];
 }
+key_obj_write($id, $settings, $org_labels);
 
 if (isset($j['force_when_busy'])) {
     db()->prepare('UPDATE user_keys SET force_when_busy = ? WHERE id = ?')
@@ -71,7 +82,6 @@ if (array_key_exists('bundle_cipher', $j)) {
     // What the bundle covers from now on: for a key passed on by a guest, the
     // difference with its current objects shows as "waiting for the owner".
     $cover = $valid;
-    foreach (explode(',', (string)$row['ble_ids']) as $bid) if ((int)$bid > 0) $cover[] = (int)$bid;
     db()->prepare('UPDATE user_keys SET bundle_cipher = ?, bundle_cipher_updated = NOW(),
                           confirmed_ids = ?, bundle_dirty = 0 WHERE id = ?')
         ->execute([$b, $b === null ? null : implode(',', $cover), $id]);
@@ -92,7 +102,7 @@ db()->prepare(
 
 audit_log($host_id, 'key_edit', 'user_key', $id, [
     'numbers' => $valid,
-    'fields' => array_intersect(array_keys($j), ['force_when_busy', 'bundle_cipher', 'native_only', 'delegate_depth']),
+    'fields' => array_intersect(array_keys($j), ['force_when_busy', 'bundle_cipher', 'objects', 'ble_ids']),
 ]);
 
 jout(['ok' => 1]);

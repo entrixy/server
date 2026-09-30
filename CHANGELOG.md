@@ -3,6 +3,31 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-01
+
+**Access is set per object in a key.** Each object carries three settings:
+"app only", how many levels it may be passed on, and how many keys with it
+may be issued in all down the chain below (3 by default). A guest passing a
+key on sets levels and the number of keys for the recipient within what came
+from above; "app only" is inherited. A browser client sees and opens only the
+objects without "app only"; a key whose every object is "app only" does not
+let a browser in at all. Bluetooth locks now sit in a key's list of objects
+like the rest; the live connection does not list them, a lock travels inside
+the bundle. The per-key limit of five passes is gone — the allowance per
+object replaces it.
+
+A running server applies this to its database and rebuilds the service binary:
+
+```sql
+ALTER TABLE key_numbers
+  ADD COLUMN native_only TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN delegate_depth TINYINT(3) UNSIGNED NOT NULL DEFAULT 1,
+  ADD COLUMN pass_pool SMALLINT(5) UNSIGNED NOT NULL DEFAULT 3;
+UPDATE key_numbers kn JOIN user_keys uk ON uk.id = kn.user_key_id
+   SET kn.native_only = uk.native_only, kn.delegate_depth = uk.delegate_depth;
+ALTER TABLE key_invites ADD COLUMN objects TEXT DEFAULT NULL AFTER ble_ids;
+```
+
 ## 2026-09-30
 
 **A guest passes a key on with one link, even from several owners.** A link

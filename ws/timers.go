@@ -209,9 +209,8 @@ func pumpNotifications() {
 				}
 			}
 		case "key_updated":
-			nums := keyNumbers(n.keyID)
 			for _, g := range hub.guestsOfKey(n.keyID) {
-				g.send(map[string]any{"type": "numbers_update", "numbers": nums})
+				g.send(map[string]any{"type": "numbers_update", "numbers": keyNumbers(n.keyID, g.snapApp())})
 			}
 		}
 	}

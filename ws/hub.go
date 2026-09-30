@@ -29,8 +29,11 @@ type Conn struct {
 	deviceFP   string
 	clientLang string
 	keyMode    string
-	sockE2EE   bool
-	lastPong   time.Time
+	// The guest proved it is the app (attestation): objects marked "app
+	// only" open for it, a browser client does not see them.
+	appClient bool
+	sockE2EE  bool
+	lastPong  time.Time
 }
 
 func (c *Conn) send(v any) {
@@ -214,6 +217,7 @@ func (c *Conn) snapRole() string     { c.mu.Lock(); defer c.mu.Unlock(); return 
 func (c *Conn) snapDeviceID() int64  { c.mu.Lock(); defer c.mu.Unlock(); return c.deviceID }
 func (c *Conn) snapLang() string     { c.mu.Lock(); defer c.mu.Unlock(); return c.clientLang }
 func (c *Conn) snapFP() string       { c.mu.Lock(); defer c.mu.Unlock(); return c.deviceFP }
+func (c *Conn) snapApp() bool        { c.mu.Lock(); defer c.mu.Unlock(); return c.appClient }
 
 // The writer. One per connection, and the only place a frame is written.
 func (c *Conn) writeLoop(ctx context.Context) {

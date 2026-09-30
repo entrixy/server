@@ -133,6 +133,7 @@ CREATE TABLE `key_invites` (
   `creator_fp` varchar(64) DEFAULT NULL,
   `number_ids` varchar(255) NOT NULL,
   `ble_ids` varchar(255) NOT NULL DEFAULT '',
+  `objects` text DEFAULT NULL,
   `welcome_cipher` text DEFAULT NULL,
   `depth` tinyint(3) unsigned NOT NULL DEFAULT 0,
   `expires_at` datetime NOT NULL,
@@ -153,6 +154,9 @@ CREATE TABLE `key_numbers` (
   `user_key_id` int(10) unsigned NOT NULL,
   `number_id` int(10) unsigned NOT NULL,
   `org_label` varchar(64) DEFAULT NULL,
+  `native_only` tinyint(1) NOT NULL DEFAULT 0,
+  `delegate_depth` tinyint(3) unsigned NOT NULL DEFAULT 1,
+  `pass_pool` smallint(5) unsigned NOT NULL DEFAULT 3,
   PRIMARY KEY (`user_key_id`,`number_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

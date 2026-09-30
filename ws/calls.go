@@ -42,13 +42,19 @@ func guestCall(c *Conn, msg map[string]any) {
 		whSecret sql.NullString
 		whMode   sql.NullString
 		devIDCol sql.NullInt64
+		appOnly  sql.NullInt64
 	)
-	err := queryRow(`SELECT n.type, n.webhook_url, n.webhook_secret, n.webhook_mode, n.device_id
+	err := queryRow(`SELECT n.type, n.webhook_url, n.webhook_secret, n.webhook_mode, n.device_id, kn.native_only
 	                 FROM key_numbers kn JOIN numbers n ON n.id = kn.number_id
 	                 WHERE kn.user_key_id = ? AND kn.number_id = ?`, userKeyID, numberID).
-		Scan(&objType, &whURL, &whSecret, &whMode, &devIDCol)
+		Scan(&objType, &whURL, &whSecret, &whMode, &devIDCol, &appOnly)
 	if err != nil {
 		c.send(map[string]any{"type": "error", "reason": "forbidden"})
+		return
+	}
+	// "App only" object: a browser client does not open it.
+	if appOnly.Int64 == 1 && !c.snapApp() {
+		c.send(map[string]any{"type": "error", "reason": "native_only"})
 		return
 	}
 	kind := objType.String
