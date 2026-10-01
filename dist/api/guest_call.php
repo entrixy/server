@@ -49,5 +49,8 @@ db()->prepare(
     'INSERT INTO call_log (user_key_id, number_id, ts, status)
      VALUES (?, ?, NOW(), ?)'
 )->execute([$row['user_key_id'], $number_id, 'requested_geo']);
+// Whoever passed this key on learns of the open over their live connection.
+db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('pass_open', ?, NOW())")
+    ->execute([$row['user_key_id']]);
 
 jout(['ok' => 1]);

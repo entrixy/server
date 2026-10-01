@@ -15,6 +15,9 @@ service binary.
 (`key_delegate.php?a=list`) returns the opens made with keys below the holder
 for the last 30 days, each tied to the link it went through — one entry per
 open (the request row), not one per answer.
+When a passed-on key is used, everyone up the chain who passed it on gets a
+`pass_open` signal over their live connection, and the app fetches the open
+at once. Rebuild the service binary.
 
 **Tighter settings take effect below at once.** When the owner (or a guest,
 for what they passed on) lowers an object's levels or number of keys, or turns

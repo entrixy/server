@@ -208,6 +208,8 @@ func pumpNotifications() {
 						"user_key_id": n.keyID, "parent_key_id": parent.Int64})
 				}
 			}
+		case "pass_open":
+			notifyPassOpen(n.keyID)
 		case "message_new":
 			for _, g := range hub.guestsOfKey(n.keyID) {
 				deliverMessages(g, n.keyID)

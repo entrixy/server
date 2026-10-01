@@ -88,6 +88,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	})
 	exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
 		userKeyID, numberID, "requested")
+	go notifyPassOpen(userKeyID)
 
 	switch {
 	// ── A webhook fired by the server ──
@@ -407,5 +408,22 @@ func flushHostQueue(host *Conn, hostID int64) {
 	}
 	if len(list) > 0 {
 		log.Printf("queue: %d message(s) handed to host %d", len(list), hostID)
+	}
+}
+
+// notifyPassOpen tells everyone up the chain who passed this key on that it
+// was used: their app then fetches the open into its journal. The owner learns
+// of the open directly and is not in the chain.
+func notifyPassOpen(userKeyID int64) {
+	cur := userKeyID
+	for i := 0; i < 50; i++ {
+		var parent sql.NullInt64
+		if queryRow(`SELECT parent_key_id FROM user_keys WHERE id = ?`, cur).Scan(&parent) != nil || !parent.Valid || parent.Int64 <= 0 {
+			return
+		}
+		cur = parent.Int64
+		for _, g := range hub.guestsOfKey(cur) {
+			g.send(map[string]any{"type": "pass_open"})
+		}
 	}
 }
