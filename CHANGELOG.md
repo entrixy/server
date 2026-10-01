@@ -13,7 +13,8 @@ service binary.
 
 **Whoever passed a key on sees its opens.** The list of passed-on keys
 (`key_delegate.php?a=list`) returns the opens made with keys below the holder
-for the last 30 days, each tied to the link it went through.
+for the last 30 days, each tied to the link it went through — one entry per
+open (the request row), not one per answer.
 
 **Tighter settings take effect below at once.** When the owner (or a guest,
 for what they passed on) lowers an object's levels or number of keys, or turns

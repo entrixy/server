@@ -448,6 +448,7 @@ if ($action === 'list') {
     }
     // Who opened what with the keys passed on below, for the holder's journal:
     // each event is attributed to the link it came through at the first step.
+    // One open leaves a request row and a row per answer; only requests count.
     $journal = [];
     $tree = key_subtree((int)$k['id']);
     if (count($tree) > 1) {
@@ -468,7 +469,8 @@ if ($action === 'list') {
         if ($top) {
             $in = implode(',', array_map('intval', array_keys($top)));
             foreach (db()->query("SELECT id, user_key_id, number_id, UNIX_TIMESTAMP(ts) AS t FROM call_log
-                                   WHERE user_key_id IN ($in) AND ts > DATE_SUB(NOW(), INTERVAL 30 DAY)
+                                   WHERE user_key_id IN ($in) AND status LIKE 'requested%'
+                                     AND ts > DATE_SUB(NOW(), INTERVAL 30 DAY)
                                    ORDER BY id DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC) as $e) {
                 $journal[] = ['id' => (int)$e['id'], 'ts' => (int)$e['t'], 'number_id' => (int)$e['number_id'],
                               'grp' => $top[(int)$e['user_key_id']]];
