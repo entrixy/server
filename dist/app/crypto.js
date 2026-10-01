@@ -230,7 +230,65 @@
              sig: btoa(String.fromCharCode(...new Uint8Array(sig))) };
   }
 
+  /* ── Passed-on keys ───────────────────────────────────────────────────
+   * A passed-on key is born here, in the recipient's browser: the server and
+   * the one who passed it on get only its fingerprint and the public half of
+   * its signing pair. Each owner seals the bundle key with the public half of
+   * the recipient's encryption pair (P-256). The format matches the app:
+   *   sealed = "v1:" + base64url(spki of the sender's ephemeral key) + "." +
+   *            base64url(nonce + ciphertext + tag) under
+   *   HMAC(HMAC(salt = recipient spki, shared), "entrixy-bundle-key" | 0x01).
+   */
+
+  /** A new key string: 24 random bytes, base64url — as the app makes it. */
+  function newUserKey() {
+    return b64uEncode(crypto.getRandomValues(new Uint8Array(24)));
+  }
+
+  /** The public half of the signing pair derived from the key, base64url. */
+  async function signPubB64(userKey) {
+    const seed = await signSeed(userKey);
+    const der = new Uint8Array(48);
+    der.set([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20], 0);
+    der.set(seed, 16);
+    const k = await crypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, true, ['sign']);
+    return (await crypto.subtle.exportKey('jwk', k)).x;
+  }
+
+  /** The recipient's encryption pair: { pub, priv } as base64url spki / pkcs8. */
+  async function newSealPair() {
+    const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+    return {
+      pub: b64uEncode(new Uint8Array(await crypto.subtle.exportKey('spki', kp.publicKey))),
+      priv: b64uEncode(new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey))),
+    };
+  }
+
+  async function hmac(keyBytes, data) {
+    const k = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return new Uint8Array(await crypto.subtle.sign('HMAC', k, data));
+  }
+
+  /** Open a sealed key with our pair; null when it does not open. */
+  async function openKey(privB64, pubB64, sealed) {
+    try {
+      const body = sealed.replace(/^v1:/, '');
+      const dot = body.indexOf('.');
+      const epk = await crypto.subtle.importKey('spki', b64uDecode(body.slice(0, dot)),
+        { name: 'ECDH', namedCurve: 'P-256' }, false, []);
+      const priv = await crypto.subtle.importKey('pkcs8', b64uDecode(privB64),
+        { name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits']);
+      const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: 'ECDH', public: epk }, priv, 256));
+      const prk = await hmac(b64uDecode(pubB64), shared);
+      const info = new TextEncoder().encode('entrixy-bundle-key');
+      const msg = new Uint8Array(info.length + 1); msg.set(info, 0); msg[info.length] = 1;
+      const wrap = await hmac(prk, msg);
+      return await decryptBytes(wrap, 'v1:' + body.slice(dot + 1));
+    } catch (_) { return null; }
+  }
+
   global.EntrixyCrypto = {
+    newUserKey, signPubB64, newSealPair, openKey,
     signHeaders, helloFields, keyHash, agreeSuite, SUITE,
     encryptString, decryptString, decryptBytes,
     hmacSha256, b64Decode, b64Encode,

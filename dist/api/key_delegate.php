@@ -298,7 +298,7 @@ if ($action === 'redeem') {
     $fp = (string)($j['device_fp'] ?? '');
     $parts_in = is_array($j['parts'] ?? null) ? $j['parts'] : [];
     if ($grp === '' || !$parts_in) jout(['error' => 'bad_input'], 400);
-    if (!preg_match('/^[A-Za-z0-9_-]{40,120}$/', $guest_pub)) jout(['error' => 'bad_pubkey'], 400);
+    if (!preg_match('/^[A-Za-z0-9_-]{40,200}$/', $guest_pub)) jout(['error' => 'bad_pubkey'], 400);   // a P-256 public half is 122 characters
     require_once __DIR__ . '/../lib/suites.php';
     $suite = (string)($j['suite'] ?? ENTRIXY_SUITE_PREFERRED);
     if (!suite_known($suite)) jout(['error' => 'unsupported_suite', 'suites' => suite_list()], 400);

@@ -64,6 +64,7 @@ Content-Type: application/json
 }',
     'objects' => 'объектов',
     'Open in the app' => 'Открыть в приложении',
+    'Open in the browser' => 'Открыть в браузере',
     'Someone passed you a key — Entrixy' => 'Вам передали ключ — Entrixy',
     'Someone passed you a key. Open it in the app: the key is created on your phone.' => 'Вам передали ключ. Откройте его в приложении: ключ создастся на вашем телефоне.',
     'You have been passed a key' => 'Вам передали ключ',

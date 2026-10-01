@@ -64,6 +64,7 @@ Content-Type: application/json
 }',
     'objects' => 'objetos',
     'Open in the app' => 'Abrir en la aplicación',
+    'Open in the browser' => 'Abrir en el navegador',
     'Someone passed you a key — Entrixy' => 'Alguien le ha pasado una llave — Entrixy',
     'Someone passed you a key. Open it in the app: the key is created on your phone.' => 'Alguien le ha pasado una llave. Ábrala en la aplicación: la llave se crea en su teléfono.',
     'You have been passed a key' => 'Le han pasado una llave',

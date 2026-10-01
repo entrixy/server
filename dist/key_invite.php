@@ -78,6 +78,12 @@ require __DIR__ . '/partials/head.php';
       (function(){var h=location.hash.slice(1),a=document.getElementById('og-open');
         if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;})();
     </script>
+    <a class="og-btn ghost" id="og-web" href="https://entrixy.com/app/#i=<?= rawurlencode($code) ?>&amp;h=<?= rawurlencode(site_host()) ?>">Open in the browser</a>
+    <script <?= csp_nonce_attr() ?>>
+      // Браузер принимает ключ сам; ключ к первому сообщению — из якоря.
+      (function(){var h=location.hash.slice(1),a=document.getElementById('og-web');
+        if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;})();
+    </script>
     <a class="og-btn ghost" href="https://entrixy.com/download/android">Install the app</a>
     <?php if ($depth > 0): ?>
     <div class="og-note">You may pass this key on to others.</div>

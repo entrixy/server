@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**A browser accepts a passed-on key.** The page of a link offers "Open in
+the browser": the browser makes a key per part and its own encryption pair,
+and opens the bundle once each owner confirms. **Fix:** the server refused the
+recipient's public key as too long (a P-256 public half is 122 characters), so
+no passed-on key could be accepted at all.
+
 **A link nobody has opened lives a week.** An opened one still reopens on the
 handset it was bound to for as long as the key lives. **Passing on is off by
 default:** an object goes into a key with zero levels unless the owner allows

@@ -64,6 +64,7 @@ Content-Type: application/json
 }',
     'objects' => '个对象',
     'Open in the app' => '在应用中打开',
+    'Open in the browser' => '在浏览器中打开',
     'Someone passed you a key — Entrixy' => '有人转交给您一把钥匙 — Entrixy',
     'Someone passed you a key. Open it in the app: the key is created on your phone.' => '有人转交给您一把钥匙。请在应用中打开：钥匙会在您的手机上生成。',
     'You have been passed a key' => '有人转交给您一把钥匙',
