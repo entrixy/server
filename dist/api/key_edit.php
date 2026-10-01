@@ -68,6 +68,9 @@ foreach ($valid as $nid) {
     if (!isset($org_labels[$nid]) && isset($cur[$nid]['org_label'])) $org_labels[$nid] = $cur[$nid]['org_label'];
 }
 key_obj_write($id, $settings, $org_labels);
+// Tighter settings take effect below at once: keys passed on beyond the new
+// limits lose the object, the newest first.
+$cut = key_obj_enforce($id);
 
 if (isset($j['force_when_busy'])) {
     db()->prepare('UPDATE user_keys SET force_when_busy = ? WHERE id = ?')
@@ -105,4 +108,4 @@ audit_log($host_id, 'key_edit', 'user_key', $id, [
     'fields' => array_intersect(array_keys($j), ['force_when_busy', 'bundle_cipher', 'objects', 'ble_ids']),
 ]);
 
-jout(['ok' => 1]);
+jout(['ok' => 1, 'revoked' => $cut]);

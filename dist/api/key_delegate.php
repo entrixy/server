@@ -465,6 +465,8 @@ if ($action === 'edit') {
         jout(['ok' => 1, 'revoked' => key_revoke_tree((int)$c['id'])]);
     }
     key_obj_write((int)$c['id'], $sets);
+    // Tighter settings for the recipient take effect below them at once.
+    key_obj_enforce((int)$c['id']);
     // The current bundle stays in place: the recipient keeps opening what was
     // confirmed until the owner assembles the new one.
     db()->prepare('UPDATE user_keys SET bundle_dirty = 1 WHERE id = ?')->execute([(int)$c['id']]);

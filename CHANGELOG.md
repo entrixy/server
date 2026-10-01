@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**Tighter settings take effect below at once.** When the owner (or a guest,
+for what they passed on) lowers an object's levels or number of keys, or turns
+passing on off, keys passed on beyond the new limits lose the object — the
+newest first, unopened links before keys. A key left with no objects is
+revoked with its branch. `key_obj_enforce()` in `lib/key_objects.php`.
+
 **A browser accepts a passed-on key.** The page of a link offers "Open in
 the browser": the browser makes a key per part and its own encryption pair,
 and opens the bundle once each owner confirms. **Fix:** the server refused the
