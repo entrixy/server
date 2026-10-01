@@ -388,6 +388,28 @@ func guestHello(c *Conn, msg map[string]any) {
 		}
 	}
 	c.send(map[string]any{"type": "devices_online", "device_ids": online})
+
+	// Messages that waited for the guest while they were away.
+	deliverMessages(c, ukID)
+}
+
+// Messages to a guest go over the live connection. A push wakes the app, but
+// only our own server can send pushes to it, and a browser has none: the
+// connection is the one path that works everywhere. A message stays on the
+// server until the guest has read it, so it also reaches a guest who was away.
+func deliverMessages(c *Conn, userKeyID int64) {
+	rows, ok := query(`SELECT id, cipher FROM guest_messages WHERE user_key_id = ? ORDER BY id`, userKeyID)
+	if !ok {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var cipher string
+		if rows.Scan(&id, &cipher) == nil {
+			c.send(map[string]any{"type": "message", "msg_id": id, "cipher": cipher})
+		}
+	}
 }
 
 // Whether the owner is online now, and when last seen if not.

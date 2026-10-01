@@ -27,6 +27,9 @@ $st = db()->prepare(
      ON DUPLICATE KEY UPDATE cipher = VALUES(cipher), created_at = CURRENT_TIMESTAMP'
 );
 $st->execute([$host_id, $user_key_id, $cipher]);
+// The live connection carries it at once; the push below only wakes the app.
+db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())')
+    ->execute(['message_new', $user_key_id]);
 
 // A data push to the topic k_<hash>. Clients subscribed to it — every device of
 // the guest holding this key — receive it even with the app killed. On receipt

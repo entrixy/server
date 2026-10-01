@@ -446,8 +446,37 @@ if ($action === 'list') {
         $mine[] = ['id' => $id, 'depth' => $o['d'], 'native_only' => $o['n'],
                    'pool_left' => $o['d'] >= 1 ? key_pool_left((int)$k['id'], $id) : 0];
     }
+    // Who opened what with the keys passed on below, for the holder's journal:
+    // each event is attributed to the link it came through at the first step.
+    $journal = [];
+    $tree = key_subtree((int)$k['id']);
+    if (count($tree) > 1) {
+        $top = [];   // key id -> share_grp of its ancestor right below the holder
+        $p = db()->prepare('SELECT id, parent_key_id, share_grp FROM user_keys WHERE id = ?');
+        foreach ($tree as $kid) {
+            if ($kid === (int)$k['id']) continue;
+            $cur = $kid; $grp = null;
+            for ($i = 0; $i < 50 && $cur; $i++) {
+                $p->execute([$cur]);
+                $row = $p->fetch(PDO::FETCH_ASSOC);
+                if (!$row) break;
+                if ((int)$row['parent_key_id'] === (int)$k['id']) { $grp = $row['share_grp']; break; }
+                $cur = (int)$row['parent_key_id'];
+            }
+            if ($grp) $top[$kid] = $grp;
+        }
+        if ($top) {
+            $in = implode(',', array_map('intval', array_keys($top)));
+            foreach (db()->query("SELECT id, user_key_id, number_id, UNIX_TIMESTAMP(ts) AS t FROM call_log
+                                   WHERE user_key_id IN ($in) AND ts > DATE_SUB(NOW(), INTERVAL 30 DAY)
+                                   ORDER BY id DESC LIMIT 200")->fetchAll(PDO::FETCH_ASSOC) as $e) {
+                $journal[] = ['id' => (int)$e['id'], 'ts' => (int)$e['t'], 'number_id' => (int)$e['number_id'],
+                              'grp' => $top[(int)$e['user_key_id']]];
+            }
+        }
+    }
     jout(['depth' => (int)$k['delegate_depth'], 'objects' => $mine,
-          'invites' => $inv, 'children' => $children]);
+          'invites' => $inv, 'children' => $children, 'journal' => $journal]);
 }
 
 // ── Change the objects of a key one passed on ───────────────────────────────────
@@ -520,6 +549,8 @@ if ($action === 'message') {
         'INSERT INTO guest_messages (host_id, user_key_id, cipher) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE cipher = VALUES(cipher), created_at = CURRENT_TIMESTAMP'
     )->execute([(int)$c['host_id'], (int)$c['id'], $cipher]);
+    db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())')
+        ->execute(['message_new', (int)$c['id']]);
     $ok = fcm_send_to_topic("k_{$c['key_hash']}", [
         'type' => 'share_message', 'hash' => $c['key_hash'], 'grp' => $grp, 'cipher' => $cipher,
     ]);

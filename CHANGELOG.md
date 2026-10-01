@@ -5,6 +5,16 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**Messages arrive over the live connection.** A message to a guest — from the
+owner, or from whoever passed the key on — is handed over the guest's open
+connection as soon as it is written, and again at each connect until it is
+read. Browsers and servers without push now get messages too. Rebuild the
+service binary.
+
+**Whoever passed a key on sees its opens.** The list of passed-on keys
+(`key_delegate.php?a=list`) returns the opens made with keys below the holder
+for the last 30 days, each tied to the link it went through.
+
 **Tighter settings take effect below at once.** When the owner (or a guest,
 for what they passed on) lowers an object's levels or number of keys, or turns
 passing on off, keys passed on beyond the new limits lose the object — the
