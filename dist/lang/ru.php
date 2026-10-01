@@ -69,7 +69,6 @@ Content-Type: application/json
     'You have been passed a key' => 'Вам передали ключ',
     'Open it in the app: the key is created on your phone and works only there.' => 'Откройте его в приложении: ключ создаётся на вашем телефоне и работает только там.',
     'Objects in the key:' => 'Объектов в ключе:',
-    'The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.' => 'Владелец видит, кто передал вам ключ, и может отозвать его одним нажатием вместе со всем, что передано дальше.',
     'Install the app if you do not have it yet.' => 'Установите приложение, если его ещё нет.',
     'Open the key in the app: your phone creates it itself, nothing is copied or forwarded.' => 'Откройте ключ в приложении: телефон создаст его сам, ничего не копируется и не пересылается.',
     'The objects appear in your list as soon as the owner confirms the key.' => 'Объекты появятся в списке, как только владелец подтвердит ключ.',

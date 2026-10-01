@@ -69,7 +69,6 @@ Content-Type: application/json
     'You have been passed a key' => '有人转交给您一把钥匙',
     'Open it in the app: the key is created on your phone and works only there.' => '请在应用中打开：钥匙在您的手机上生成，也只在那里有效。',
     'Objects in the key:' => '钥匙中的对象：',
-    'The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.' => '所有者能看到是谁把钥匙转交给您，并可一键收回，连同之后继续转交出去的一切。',
     'Install the app if you do not have it yet.' => '如果还没有安装应用，请先安装。',
     'Open the key in the app: your phone creates it itself, nothing is copied or forwarded.' => '在应用中打开钥匙：手机会自行生成它，不会复制或转发任何内容。',
     'The objects appear in your list as soon as the owner confirms the key.' => '所有者确认钥匙后，对象就会出现在您的列表中。',

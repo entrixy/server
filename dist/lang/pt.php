@@ -69,7 +69,6 @@ Content-Type: application/json
     'You have been passed a key' => 'Passaram-lhe uma chave',
     'Open it in the app: the key is created on your phone and works only there.' => 'Abra-a na aplicação: a chave é criada no seu telefone e só funciona lá.',
     'Objects in the key:' => 'Objetos na chave:',
-    'The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.' => 'O proprietário vê quem lhe passou a chave e pode retirá-la com um toque, juntamente com tudo o que foi passado adiante.',
     'Install the app if you do not have it yet.' => 'Instale a aplicação se ainda não a tiver.',
     'Open the key in the app: your phone creates it itself, nothing is copied or forwarded.' => 'Abra a chave na aplicação: o telefone cria-a sozinho, nada é copiado nem reencaminhado.',
     'The objects appear in your list as soon as the owner confirms the key.' => 'Os objetos aparecem na sua lista assim que o proprietário confirmar a chave.',

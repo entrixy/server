@@ -69,7 +69,6 @@ Content-Type: application/json
     'You have been passed a key' => 'Ihnen wurde ein Schlüssel weitergegeben',
     'Open it in the app: the key is created on your phone and works only there.' => 'Öffnen Sie ihn in der App: Der Schlüssel entsteht auf Ihrem Telefon und funktioniert nur dort.',
     'Objects in the key:' => 'Objekte im Schlüssel:',
-    'The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.' => 'Der Eigentümer sieht, wer Ihnen den Schlüssel weitergegeben hat, und kann ihn mit einem Tippen zurücknehmen, samt allem, was weitergegeben wurde.',
     'Install the app if you do not have it yet.' => 'Installieren Sie die App, falls sie noch fehlt.',
     'Open the key in the app: your phone creates it itself, nothing is copied or forwarded.' => 'Öffnen Sie den Schlüssel in der App: Ihr Telefon erzeugt ihn selbst, nichts wird kopiert oder weitergeleitet.',
     'The objects appear in your list as soon as the owner confirms the key.' => 'Die Objekte erscheinen in Ihrer Liste, sobald der Eigentümer den Schlüssel bestätigt.',

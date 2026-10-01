@@ -66,7 +66,6 @@ require __DIR__ . '/partials/head.php';
   <div class="og-card">
 <?php if ($state === 'new'): ?>
     <p class="og-sub">Objects in the key: <strong><?= (int)$objects ?></strong></p>
-    <p class="og-sub">The owner sees who passed the key to you and can take it back in one tap, together with everything passed on further.</p>
     <ol class="og-steps">
       <li>Install the app if you do not have it yet.</li>
       <li>Open the key in the app: your phone creates it itself, nothing is copied or forwarded.</li>
