@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**"App only" covers the whole branch.** When the owner (or a guest, for what
+they passed on) turns "app only" on or off for an object, every key below
+holding it gets the same flag at once and is told over its connection: a
+browser below loses the object without a reload. `key_obj_enforce()` in
+`lib/key_objects.php`.
+
 **Messages arrive over the live connection.** A message to a guest — from the
 owner, or from whoever passed the key on — is handed over the guest's open
 connection as soon as it is written, and again at each connect until it is

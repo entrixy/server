@@ -124,6 +124,8 @@ function key_pool_left(int $keyId, int $numberId, ?int $skipChild = null, ?int $
  *   - fewer keys in all: the newest keys over the limit lose it (links nobody
  *     has opened go first);
  *   - passing on turned off: every key below loses it.
+ * "App only" is not a limit but a copy: every key below holds the object with
+ * the same flag as $keyId, turned on or off.
  * A key that loses an object passes the loss down its own branch. A key left
  * with no objects is revoked with everything below it; one that keeps some
  * waits for its owner to assemble the bundle anew.
@@ -194,6 +196,28 @@ function key_obj_enforce(int $keyId): array {
             $has->execute([$k, $nid]);
             if ($has->fetchColumn()) { $strip($k, $nid); $over--; }
         }
+    }
+
+    // "App only" goes down the branch as it is set here: keys below copy it.
+    $flagged = [];
+    $below = array_values(array_filter(key_subtree($keyId), fn($k) => (int)$k !== $keyId));
+    if ($below) {
+        $in = implode(',', array_map('intval', $below));
+        $set = db()->prepare("UPDATE key_numbers SET native_only = ?
+                               WHERE number_id = ? AND native_only <> ? AND user_key_id IN ($in)");
+        $who = db()->prepare("SELECT user_key_id FROM key_numbers
+                               WHERE number_id = ? AND native_only <> ? AND user_key_id IN ($in)");
+        foreach (key_obj_read($keyId) as $nid => $s) {
+            $who->execute([$nid, $s['n']]);
+            foreach ($who->fetchAll(PDO::FETCH_COLUMN) as $k) $flagged[(int)$k] = true;
+            $set->execute([$s['n'], $nid, $s['n']]);
+        }
+    }
+    foreach (array_keys($flagged) as $k) {
+        if (isset($touched[$k])) continue;   // told below with its other changes
+        key_obj_summary($k);
+        db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?,?,NOW())')
+            ->execute(['key_updated', $k]);
     }
 
     // What the keys that lost objects become.
