@@ -5,6 +5,14 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**A link nobody has opened lives a week.** An opened one still reopens on the
+handset it was bound to for as long as the key lives. **Passing on is off by
+default:** an object goes into a key with zero levels unless the owner allows
+more. **A moved key takes its links along:** the new handset can add to links
+the old one made. **A guest cannot ask the server to open a Bluetooth lock** —
+it opens only next to it. Rebuild the service binary;
+`ALTER TABLE key_numbers ALTER COLUMN delegate_depth SET DEFAULT 0;`
+
 **A day between moves instead of three.** `MOVE_COOLDOWN` in
 `lib/device_move.php`.
 

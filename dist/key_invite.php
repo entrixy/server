@@ -16,7 +16,7 @@ if ($code !== '') {
     // The recipient sees them as one key, so the page sums them up.
     // The link lives until the one who passed it deletes it: an accepted part
     // whose key is still alive opens again on the same handset.
-    $st = db()->prepare('SELECT k.status, k.number_ids, k.ble_ids, k.depth, uk.id AS alive
+    $st = db()->prepare('SELECT k.status, k.number_ids, k.ble_ids, k.depth, k.expires_at, uk.id AS alive
                            FROM key_invites k LEFT JOIN user_keys uk ON uk.id = k.child_key_id
                           WHERE k.grp = ?');
     $st->execute([$code]);
@@ -24,6 +24,7 @@ if ($code !== '') {
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $inv) {
         $s = $inv['status'];
         if ($s === 'redeemed') $s = $inv['alive'] ? 'new' : 'cancelled';
+        elseif ($s === 'new' && strtotime($inv['expires_at']) < time()) $s = 'expired';
         $seen[] = $s;
         foreach ([$inv['number_ids'], $inv['ble_ids']] as $list) {
             foreach (explode(',', (string)$list) as $x) if ((int)$x > 0) $objects++;

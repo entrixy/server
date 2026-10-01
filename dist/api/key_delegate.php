@@ -30,7 +30,8 @@ require_once __DIR__ . '/../lib/key_tree.php';
 require_once __DIR__ . '/../lib/key_objects.php';
 require_once __DIR__ . '/../lib/fcm.php';
 
-const DELEGATE_INVITE_HOURS = 720; // a formality: a link lives until it is deleted
+const DELEGATE_INVITE_HOURS = 168; // a link nobody has opened lives a week; an opened one
+                                    // reopens on its handset for as long as the key lives
 
 $action = (string)($_GET['a'] ?? '');
 $j = jin();
@@ -273,6 +274,8 @@ if ($action === 'info') {
         if ($state === 'redeemed') {
             $alive->execute([(int)$inv['child_key_id']]);
             if (!$alive->fetchColumn()) $state = 'cancelled';
+        } elseif ($state === 'new' && strtotime($inv['expires_at']) < time()) {
+            $state = 'expired';
         }
         if ($state === 'new' || $state === 'redeemed') $open++;
         if ($welcome === null && $inv['welcome_cipher']) $welcome = $inv['welcome_cipher'];
@@ -343,6 +346,7 @@ if ($action === 'redeem') {
             continue;
         }
         if ($inv['status'] !== 'new') { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
+        if (strtotime($inv['expires_at']) < time()) { $out[] = ['code' => $code, 'error' => 'expired']; continue; }
         // Is the parent still alive?
         $par->execute([(int)$inv['parent_key_id']]);
         $pk = $par->fetch(PDO::FETCH_ASSOC);
@@ -401,12 +405,13 @@ if ($action === 'cancel') {
 if ($action === 'list') {
     $k = guest_key_auth($j);
     $st = db()->prepare(
-        'SELECT code, grp, number_ids, ble_ids, objects, depth, status, child_key_id, created_at, redeemed_at
+        'SELECT code, grp, number_ids, ble_ids, objects, depth, status, child_key_id, created_at, expires_at, redeemed_at
          FROM key_invites WHERE parent_key_id = ? ORDER BY id DESC LIMIT 50'
     );
     $st->execute([(int)$k['id']]);
     $inv = $st->fetchAll(PDO::FETCH_ASSOC);
     foreach ($inv as &$i) {
+        if ($i['status'] === 'new' && strtotime($i['expires_at']) < time()) $i['status'] = 'expired';
         $i['number_ids'] = csv_ids($i['number_ids']);
         $i['ble_ids'] = csv_ids($i['ble_ids']);
         $i['objects'] = array_map(fn($o) => ['id' => (int)$o['id'], 'depth' => (int)$o['d'], 'pool' => (int)$o['p']],

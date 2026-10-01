@@ -61,6 +61,12 @@ func guestCall(c *Conn, msg map[string]any) {
 	if kind == "" {
 		kind = "call"
 	}
+	// A Bluetooth lock is in the key's list but opens only next to it, from
+	// the guest's own handset: there is nothing to send anywhere.
+	if kind == "ble" {
+		c.send(map[string]any{"type": "error", "reason": "forbidden"})
+		return
+	}
 
 	var recent int
 	queryRow(`SELECT COUNT(*) FROM call_log

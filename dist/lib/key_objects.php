@@ -16,7 +16,7 @@
 
 const KEY_OBJ_DEPTH_MAX = 5;
 const KEY_OBJ_POOL_MAX  = 50;
-const KEY_OBJ_DEFAULTS  = ['n' => 0, 'd' => 1, 'p' => 3];
+const KEY_OBJ_DEFAULTS  = ['n' => 0, 'd' => 0, 'p' => 3];   // passing on is allowed on purpose, not by default
 
 /** Settings per object id out of the request's "objects" list, with defaults. */
 function key_obj_settings_in(array $j, array $ids, array $defaults = KEY_OBJ_DEFAULTS): array {
@@ -106,7 +106,7 @@ function key_pool_left(int $keyId, int $numberId, ?int $skipChild = null, ?int $
         // Links nobody has opened yet hold their place too.
         $in = implode(',', array_map('intval', $tree));
         $inv = db()->query("SELECT number_ids, ble_ids FROM key_invites
-                             WHERE status = 'new' AND parent_key_id IN ($in)
+                             WHERE status = 'new' AND expires_at > NOW() AND parent_key_id IN ($in)
                                AND id <> " . (int)$skipInvite)->fetchAll(PDO::FETCH_ASSOC);
         foreach ($inv as $i) {
             $ids = array_map('intval', array_filter(explode(',', $i['number_ids'] . ',' . $i['ble_ids'])));

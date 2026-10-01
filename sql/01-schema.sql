@@ -155,7 +155,7 @@ CREATE TABLE `key_numbers` (
   `number_id` int(10) unsigned NOT NULL,
   `org_label` varchar(64) DEFAULT NULL,
   `native_only` tinyint(1) NOT NULL DEFAULT 0,
-  `delegate_depth` tinyint(3) unsigned NOT NULL DEFAULT 1,
+  `delegate_depth` tinyint(3) unsigned NOT NULL DEFAULT 0,
   `pass_pool` smallint(5) unsigned NOT NULL DEFAULT 3,
   PRIMARY KEY (`user_key_id`,`number_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;

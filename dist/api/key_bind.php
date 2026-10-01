@@ -89,6 +89,10 @@ switch ($d['action']) {
         if (!$want_move) jout(['error' => 'already_bound'], 403);
         device_move_apply('user_keys', $kid, $device_fp, $current);
         db()->prepare('UPDATE user_keys SET sign_pub_device = ? WHERE id = ?')->execute([$device_pub, $kid]);
+        // Links this key passed on were made from the previous handset; the
+        // new one must be able to add to them.
+        db()->prepare('UPDATE key_invites SET creator_fp = ? WHERE parent_key_id = ? AND creator_fp = ?')
+            ->execute([$device_fp, $kid, $current]);
         // The previous handset loses the key at once: its live connection is
         // told the key is gone, and on reconnecting it is refused as bound
         // elsewhere.

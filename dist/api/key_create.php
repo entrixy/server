@@ -115,7 +115,7 @@ if ($org_id === null) {
 // Delegation depth: how many issues are allowed BELOW this key. Zero for a
 // company — it opens itself and passes nothing on — and one level by default for
 // a person.
-$depth = $org_id !== null ? 0 : (int)($j['delegate_depth'] ?? 1);
+$depth = $org_id !== null ? 0 : (int)($j['delegate_depth'] ?? 0);
 if ($depth < 0) $depth = 0;
 if ($depth > 255) $depth = 255;
 
