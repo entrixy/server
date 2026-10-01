@@ -8,13 +8,13 @@
  *
  * Repeat moves are limited: no more often than once per MOVE_COOLDOWN. A first
  * move after a long quiet period is always allowed — otherwise someone whose new
- * phone turned out faulty would be locked out for three days.
+ * phone turned out faulty would be locked out for a day.
  *
  * Why the limit: a copy of the keys travels as a file, and without a delay it
  * could be passed around in a circle. With one, passing it around becomes
  * noticeable.
 
-const MOVE_COOLDOWN = 3 * 24 * 3600;   // three days between moves
+const MOVE_COOLDOWN = 24 * 3600;       // a day between moves
 
 /**
  * The verdict on a presented device fingerprint.

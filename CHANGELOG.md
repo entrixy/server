@@ -5,6 +5,16 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-01
 
+**A day between moves instead of three.** `MOVE_COOLDOWN` in
+`lib/device_move.php`.
+
+**The app identifies an installation, not the phone.** The fingerprint it
+sends is derived from a random seed made at install and differs for every
+server, so two servers cannot tell they see the same phone. Phones switch by
+moving to the new fingerprint as an ordinary move, once. A server that wants
+the switch to pass at once clears its move timestamps:
+`UPDATE hosts SET moved_at = NULL; UPDATE user_keys SET moved_at = NULL;`
+
 **A received key moves with a backup.** `key_bind.php` with `move: 1`,
 signed with the pair of the handset the key sat on, moves the key to the new
 handset (same window between moves as for an owner); the previous handset is
