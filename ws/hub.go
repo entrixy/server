@@ -113,6 +113,9 @@ type Hub struct {
 
 	stateMu   sync.Mutex
 	lastState map[int64]time.Time
+	// Every command-driven change of an object's position bumps its counter, so
+	// a pending auto-close knows whether someone has pressed since.
+	stateGen map[int64]int64
 }
 
 func newHub() *Hub {
@@ -123,6 +126,7 @@ func newHub() *Hub {
 		calls:     map[string]*Call{},
 		lastHello: map[string]time.Time{},
 		lastState: map[int64]time.Time{},
+		stateGen:  map[int64]int64{},
 	}
 }
 

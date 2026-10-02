@@ -3,6 +3,22 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-02
+
+**A webhook object can open and close.** A guest's or the owner's call may
+carry `"action":"toggle"`: the server sends `close` if the object's last
+position is open, otherwise `open`, and signs whichever it sends
+(`timestamp.nonce.action.object_id`). A phone-mode call passes the action on
+to the owner's phone in `do_webhook`.
+
+**The position follows the answer, and only for a while.** The receiver's
+`"position"` is applied at once, without the five-second limit that guards
+against a flapping controller. For an open/close object whose receiver keeps
+silent, the position follows the command. With `"close_in"` the object shows
+closed once the seconds run out; without it the position turns unknown after
+two seconds — a webhook reports nothing between presses. A newer press
+cancels the pending change. Rebuild the service binary.
+
 ## 2026-10-01
 
 **"App only" covers the whole branch.** When the owner (or a guest, for what

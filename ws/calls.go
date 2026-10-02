@@ -93,10 +93,12 @@ func guestCall(c *Conn, msg map[string]any) {
 	switch {
 	// ── A webhook fired by the server ──
 	case kind == "webhook" && whMode.String == "server" && whURL.String != "":
+		action, bistable := resolveWebhookAction(numberID, str(msg, "action"))
 		fireWebhook(webhookJob{
 			URL: whURL.String, Secret: whSecret.String,
 			NumberID: numberID, CallID: callID, HostID: hostID,
 			Requester: c, UserKeyID: userKeyID, NotifyHost: true,
+			Action: action, Bistable: bistable,
 		})
 		c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sending"})
 
@@ -138,8 +140,13 @@ func guestCall(c *Conn, msg map[string]any) {
 			hub.dropCall(callID)
 			return
 		}
-		h.send(map[string]any{"type": "do_webhook", "call_id": callID,
-			"number_id": numberID, "user_key_id": userKeyID})
+		// The owner's phone resolves "toggle" itself, by the position it holds.
+		dw := map[string]any{"type": "do_webhook", "call_id": callID,
+			"number_id": numberID, "user_key_id": userKeyID}
+		if a := str(msg, "action"); a == "toggle" || a == "close" {
+			dw["action"] = a
+		}
+		h.send(dw)
 		c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sent_to_host"})
 
 	// ── A phone call ──
@@ -193,10 +200,12 @@ func hostSelfWebhook(c *Conn, msg map[string]any) {
 
 	callID := newCallID()
 	hub.putCall(callID, &Call{NumberID: numberID, HostID: hostID})
+	action, bistable := resolveWebhookAction(numberID, str(msg, "action"))
 	fireWebhook(webhookJob{
 		URL: whURL.String, Secret: whSecret.String,
 		NumberID: numberID, CallID: callID, HostID: hostID,
 		Requester: c, UserKeyID: 0, NotifyHost: false,
+		Action: action, Bistable: bistable,
 	})
 	c.send(map[string]any{"type": "device_sent", "call_id": callID,
 		"number_id": numberID,
@@ -307,6 +316,60 @@ func callStatus(c *Conn, msg map[string]any) {
 // Applies a new position with a diff, a rate limit and a broadcast. Returns
 // true when the state really changed and the broadcast went out.
 func applyObjectState(hostID, numID int64, position string) bool {
+	return setObjectState(hostID, numID, position, false)
+}
+
+// The position that follows a command — somebody pressed open or close. It is
+// not throttled: a close two seconds after an open is the point, not flapping.
+func applyCommandState(hostID, numID int64, position string) bool {
+	hub.stateMu.Lock()
+	hub.stateGen[numID]++
+	hub.stateMu.Unlock()
+	return setObjectState(hostID, numID, position, true)
+}
+
+// A webhook reports its position only in the answer to a press; what happens
+// afterwards nobody tells us. If the receiver named a time (close_in), the
+// object is closed once it runs out. If not, after two seconds the position is
+// unknown, and the next press of an open/close object opens again. Either way
+// only if nobody has pressed in the meantime.
+func scheduleWebhookForget(hostID, numID int64, position string, closeIn int) {
+	delay, then := 2*time.Second, "unknown"
+	if position == "open" && closeIn > 0 && closeIn <= 3600 {
+		delay, then = time.Duration(closeIn)*time.Second, "closed"
+	}
+	hub.stateMu.Lock()
+	gen := hub.stateGen[numID]
+	hub.stateMu.Unlock()
+	time.AfterFunc(delay, func() {
+		hub.stateMu.Lock()
+		same := hub.stateGen[numID] == gen
+		hub.stateMu.Unlock()
+		if same {
+			applyCommandState(hostID, numID, then)
+		}
+	})
+}
+
+// What to send for a webhook. "toggle" is resolved here, by the position the
+// server keeps for everyone: a phone may have missed somebody else's press.
+// The second value tells whether the object is open/close rather than a pulse.
+func resolveWebhookAction(numID int64, requested string) (string, bool) {
+	switch requested {
+	case "close":
+		return "close", true
+	case "toggle":
+		var last sql.NullString
+		queryRow(`SELECT last_state FROM numbers WHERE id = ?`, numID).Scan(&last)
+		if last.String == "open" {
+			return "close", true
+		}
+		return "open", true
+	}
+	return "open", false
+}
+
+func setObjectState(hostID, numID int64, position string, force bool) bool {
 	if !validPosition(position) {
 		return false
 	}
@@ -320,9 +383,9 @@ func applyObjectState(hostID, numID int64, position string) bool {
 		return false
 	}
 
-	// One broadcast per five seconds per object.
+	// One broadcast per five seconds per object, unless a command caused it.
 	hub.stateMu.Lock()
-	if time.Since(hub.lastState[numID]) < 5*time.Second {
+	if !force && time.Since(hub.lastState[numID]) < 5*time.Second {
 		hub.stateMu.Unlock()
 		return false
 	}

@@ -28,6 +28,10 @@ type webhookJob struct {
 	UserKeyID int64
 	// A guest's opening is also reported to the owner, silently, for the log.
 	NotifyHost bool
+	// "open" or "close". Bistable: the object is open/close, so the position
+	// follows the command even when the receiver does not report one.
+	Action   string
+	Bistable bool
 }
 
 // The address a webhook may not be sent to. The check happens at the moment of
@@ -100,7 +104,10 @@ func fireWebhook(j webhookJob) {
 		return
 	}
 
-	payload := map[string]any{"action": "open", "object_id": j.NumberID}
+	if j.Action != "close" {
+		j.Action = "open"
+	}
+	payload := map[string]any{"action": j.Action, "object_id": j.NumberID}
 	if j.Secret != "" {
 		nonce := make([]byte, 8)
 		rand.Read(nonce)
@@ -109,7 +116,7 @@ func fireWebhook(j webhookJob) {
 		payload["nonce"] = hex.EncodeToString(nonce)
 		// The signature covers a canonical string rather than the JSON, so the
 		// receiver need not reproduce the serialisation byte for byte.
-		base := fmt.Sprintf("%d.%s.open.%d", ts, payload["nonce"], j.NumberID)
+		base := fmt.Sprintf("%d.%s.%s.%d", ts, payload["nonce"], j.Action, j.NumberID)
 		mac := hmac.New(sha256.New, []byte(j.Secret))
 		mac.Write([]byte(base))
 		payload["signature"] = hex.EncodeToString(mac.Sum(nil))
@@ -153,9 +160,19 @@ func fireWebhook(j webhookJob) {
 		}
 		whlog("call=%s result level=%s msg=%.120s", j.CallID, level, message)
 
-		// A position in the answer belongs to a bistable object.
-		if pos, _ := result["position"].(string); validPosition(pos) {
-			applyObjectState(j.HostID, j.NumberID, pos)
+		// The position: from the answer, or — for an open/close object whose
+		// receiver keeps silent — from the command that went through.
+		pos, _ := result["position"].(string)
+		if !validPosition(pos) && j.Bistable && level != "danger" {
+			pos = "open"
+			if j.Action == "close" {
+				pos = "closed"
+			}
+		}
+		if validPosition(pos) {
+			applyCommandState(j.HostID, j.NumberID, pos)
+			ci, _ := result["close_in"].(float64)
+			scheduleWebhookForget(j.HostID, j.NumberID, pos, int(ci))
 		}
 		j.finish(level, message, true)
 	}()

@@ -273,7 +273,7 @@ func webhookResult(c *Conn, msg map[string]any) {
 			info.UserKeyID, info.NumberID, "webhook_"+level)
 	}
 	if pos := str(msg, "position"); validPosition(pos) {
-		applyObjectState(c.snapHostID(), info.NumberID, pos)
+		applyCommandState(c.snapHostID(), info.NumberID, pos)
 	}
 	hub.dropCall(callID)
 }

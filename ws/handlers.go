@@ -138,7 +138,8 @@ func handleMessage(c *Conn, data []byte) {
 		numID := num(msg, "num_id")
 		pos := str(msg, "position")
 		if numID > 0 && validPosition(pos) {
-			applyObjectState(c.snapHostID(), numID, pos)
+			// Only the owner's app sends it, after a press or its auto-close.
+			applyCommandState(c.snapHostID(), numID, pos)
 		}
 	case "avatar_request":
 		avatarRequest(c, msg)
