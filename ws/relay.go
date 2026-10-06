@@ -61,12 +61,18 @@ func sockFire(c *Conn, msg map[string]any) {
 		c.send(map[string]any{"type": "error", "reason": "device_offline"})
 		return
 	}
-	dev.send(map[string]any{
+	fire := map[string]any{
 		"type": "sock_fire", "command_id": cid, "number_id": info.NumberID,
 		"token": str(msg, "token"), "owner_sig": str(msg, "owner_sig"),
 		"guest_id": num(msg, "guest_id"), "nonce": str(msg, "nonce"),
 		"proof": str(msg, "proof"),
-	})
+	}
+	// The action travels as the signer sent it: a close is signed over
+	// nonce||"close", so changing it here only makes the controller refuse.
+	if str(msg, "action") == "close" {
+		fire["action"] = "close"
+	}
+	dev.send(fire)
 }
 
 // The owner blocks or unblocks a guest on one controller, signed with their own
@@ -131,6 +137,12 @@ func deviceHello(c *Conn, msg map[string]any) {
 	// Whether the firmware speaks the encrypted protocol. Older boards do not
 	// send the field and go on taking a plain command.
 	c.sockE2EE = boolOf(msg, "e2ee", false)
+	// Firmware that takes its keepalive period from the server says so; older
+	// boards ping every 30 s whatever we tell them, and are judged by that.
+	c.pingS = 30
+	if boolOf(msg, "ping_ctl", false) {
+		c.pingS = cfg.DevicePingS
+	}
 	c.mu.Unlock()
 	hub.mu.Lock()
 	hub.devices[id] = c
@@ -139,7 +151,7 @@ func deviceHello(c *Conn, msg map[string]any) {
 	exec(`UPDATE devices SET last_seen = NOW() WHERE id = ?`, id)
 	// hb_interval — how often the board should report in. Fixed for now; with
 	// many boards it becomes a function of their number.
-	c.send(map[string]any{"type": "device_ok", "hb_interval": 300})
+	c.send(map[string]any{"type": "device_ok", "hb_interval": 300, "ping_s": cfg.DevicePingS})
 
 	// Catch up on revocations accumulated while the board was offline. It
 	// applies them by version and ignores the stale ones.
@@ -206,6 +218,21 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 	if info != nil {
 		numberID = info.NumberID
 	}
+	// The board's own event — the exit button, the limit switch, auto-close.
+	// No command stands behind it, so the object is found by the controller.
+	event := str(msg, "event")
+	switch event {
+	case "button", "limit", "auto":
+	default:
+		event = ""
+	}
+	if info == nil {
+		var nid int64
+		if queryRow(`SELECT id FROM numbers WHERE device_id = ? AND type = 'device'`,
+			c.snapDeviceID()).Scan(&nid) == nil {
+			numberID = nid
+		}
+	}
 	if info != nil {
 		if g := hub.guest(info.GuestOID); g != nil {
 			g.send(map[string]any{"type": "device_status", "call_id": commandID,
@@ -221,9 +248,19 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		keyID = info.UserKeyID
 	}
 	if h := hub.host(c.snapHostID()); h != nil {
-		h.send(map[string]any{"type": "device_status", "call_id": commandID,
+		out := map[string]any{"type": "device_status", "call_id": commandID,
 			"device_id": c.snapDeviceID(), "number_id": numberID, "level": level,
-			"message": message, "final": final, "silent": guestInit, "user_key_id": keyID})
+			"message": message, "final": final, "user_key_id": keyID,
+			// Sound belongs to the owner's own presses: a guest or the board
+			// itself goes into the log quietly.
+			"silent": guestInit || event != ""}
+		if event != "" {
+			out["event"] = event
+		}
+		if info != nil && info.Action != "" {
+			out["action"] = info.Action
+		}
+		h.send(out)
 	}
 	if info != nil && info.UserKeyID > 0 {
 		exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
@@ -235,7 +272,15 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		var nid, hid int64
 		if err := queryRow(`SELECT id, host_id FROM numbers WHERE device_id = ? AND type = 'device'`,
 			c.snapDeviceID()).Scan(&nid, &hid); err == nil {
-			applyObjectState(hid, nid, pos)
+			// A reply to a command or the board's own event (button, limit
+			// switch, auto-close) is a real movement: no five-second limit,
+			// or a close right after an open never reaches the phones. Only
+			// the periodic heartbeat is throttled.
+			if info != nil || event != "" {
+				applyCommandState(hid, nid, pos)
+			} else {
+				applyObjectState(hid, nid, pos)
+			}
 		}
 	}
 

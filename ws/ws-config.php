@@ -21,4 +21,7 @@ echo json_encode([
     'rate_limit_per_min' => (int)$GLOBALS['rate_limit_per_min'],
     'promo_base_url'     => 'https://entrixy.com',
     'access_code'        => (string)($GLOBALS['access_code'] ?? ''),
+    // Как часто контроллер подаёт «я жив», секунд (5..300). Сервер отключает
+    // контроллер после трёх пропусков: меньше — быстрее «не в сети», больше трафика.
+    'device_ping_s'      => (int)($GLOBALS['device_ping_s'] ?? 30),
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";

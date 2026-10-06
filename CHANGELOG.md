@@ -3,6 +3,49 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-06
+
+**A bound controller can close.** A bistable controller that is bound to the
+app used to open on every signed press: `sock_fire` carried no action. Now a
+close travels as `"action":"close"` and is signed over `nonce || "close"`;
+an open is signed over the bare nonce, as before. The server passes the action
+on as the signer sent it — changing it only makes the controller refuse. Who
+presses decides, by the position the controller reported. A plain
+`device_command` carries the action the caller asked for, too.
+
+**The controller tells what happened on it by itself.** The exit button, the
+limit switch and auto-close arrive as `device_status` with an empty
+`command_id` and an `event` field (`button`, `limit`, `auto`); the server finds
+the object by the controller and hands the event to the owner quietly, for the
+log.
+
+**A real movement is never throttled.** The position from a reply to a command
+or from such an event goes out at once; only the periodic heartbeat keeps the
+five-second limit. Before, a close two seconds after an open never reached the
+phones, and the next press closed again.
+
+**A guest learns the positions on connect.** Right after `guest_ok` the server
+sends `obj_state_update` for every object of the key that has a position;
+before, a guest learnt it only from the next change.
+
+**The owner sets how quickly a silent controller goes offline.** New setting
+`DEVICE_PING_S` (default 30, 5..300): the server tells it to the controller in
+`device_ok.ping_s` and drops the controller after three missed signals, checking
+every five seconds. Firmware that follows it says `"ping_ctl":true` in
+`device_hello`; older firmware keeps its own 30 seconds. See "Controller
+presence" in the README. Rebuild the service binary and add the setting to
+`.env` if you want a value other than 30.
+
+## 2026-10-05
+
+**A greeting that comes too soon waits instead of losing the link.** One
+greeting per phone or key is still accepted every five seconds, but the next
+one no longer has its connection closed: it waits for the end of the interval
+and is then answered. An app restarted a few seconds after it connected — the
+system does this after an update — used to be left without a link until its
+own ping gave up. Only a third greeting, arriving while one already waits, is
+treated as a storm and closed. Rebuild the service binary.
+
 ## 2026-10-02
 
 **A webhook object can open and close.** A guest's or the owner's call may

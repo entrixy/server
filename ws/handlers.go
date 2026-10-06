@@ -16,9 +16,12 @@ import (
 	"time"
 )
 
-// A greeting repeated oftener than this closes the connection without touching
-// the database: while a websocket flaps a client could throw one at the server
-// every second, and each costs a lookup.
+// Greetings from one phone or key are spaced at least this far apart: while a
+// websocket flaps a client could throw one at the server every second, and each
+// costs a lookup. One greeting that comes too soon waits for its turn — an app
+// restarted a few seconds after its last connect is not a storm, and closing
+// it left the phone without a link. A second one already waiting is a storm,
+// and its connection is closed.
 const helloMinInterval = 5 * time.Second
 
 var (
@@ -82,9 +85,16 @@ func handleMessage(c *Conn, data []byte) {
 		hub.helloMu.Lock()
 		prev := hub.lastHello[key]
 		now := time.Now()
-		tooSoon := now.Sub(prev) < helloMinInterval
-		if !tooSoon {
-			hub.lastHello[key] = now
+		// The slot for this greeting: now, or the end of the interval after
+		// the previous one. A slot further than one interval away means
+		// another greeting is already waiting.
+		slot := now
+		if next := prev.Add(helloMinInterval); next.After(now) {
+			slot = next
+		}
+		storm := slot.Sub(now) > helloMinInterval
+		if !storm {
+			hub.lastHello[key] = slot
 			if len(hub.lastHello) > 10000 {
 				for k, t := range hub.lastHello {
 					if now.Sub(t) > time.Minute {
@@ -94,11 +104,18 @@ func handleMessage(c *Conn, data []byte) {
 			}
 		}
 		hub.helloMu.Unlock()
-		if tooSoon {
-			// Closed quietly, with no answer: the client reconnects on its own
-			// backoff, which grows with each attempt.
+		if storm {
 			c.close()
 			return
+		}
+		if wait := slot.Sub(now); wait > 0 {
+			t := time.NewTimer(wait)
+			select {
+			case <-t.C:
+			case <-c.closed:
+				t.Stop()
+				return
+			}
 		}
 	}
 
@@ -389,6 +406,25 @@ func guestHello(c *Conn, msg map[string]any) {
 		}
 	}
 	c.send(map[string]any{"type": "devices_online", "device_ids": online})
+
+	// Where the objects stand right now. Without it a guest learnt the position
+	// only from the next change, and the first press on an open lock opened it
+	// again instead of closing.
+	if rows, ok := query(`SELECT n.id, n.last_state, UNIX_TIMESTAMP(n.last_state_at)
+	                      FROM key_numbers kn JOIN numbers n ON n.id = kn.number_id
+	                      WHERE kn.user_key_id = ? AND n.last_state IS NOT NULL`, ukID); ok {
+		for rows.Next() {
+			var nid int64
+			var pos sql.NullString
+			var at sql.NullInt64
+			if rows.Scan(&nid, &pos, &at) != nil || !validPosition(pos.String) {
+				continue
+			}
+			c.send(map[string]any{"type": "obj_state_update", "num_id": nid,
+				"position": pos.String, "updated_at": at.Int64})
+		}
+		rows.Close()
+	}
 
 	// Messages that waited for the guest while they were away.
 	deliverMessages(c, ukID)

@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+// The action for a controller: "close" only when asked for, anything else opens.
+func deviceAction(msg map[string]any) string {
+	if str(msg, "action") == "close" {
+		return "close"
+	}
+	return "open"
+}
+
 func validPosition(p string) bool {
 	return p == "open" || p == "closed" || p == "unknown"
 }
@@ -110,9 +118,11 @@ func guestCall(c *Conn, msg map[string]any) {
 			hub.dropCall(callID)
 			return
 		}
+		action := deviceAction(msg)
 		if call := hub.call(callID); call != nil {
 			hub.mu.Lock()
 			call.DeviceID = devIDCol.Int64
+			call.Action = action
 			hub.mu.Unlock()
 		}
 		if dev.sockE2EE {
@@ -123,7 +133,7 @@ func guestCall(c *Conn, msg map[string]any) {
 				"command_id": callID, "number_id": numberID})
 			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "challenge_pending"})
 		} else {
-			dev.send(map[string]any{"type": "device_command", "action": "open",
+			dev.send(map[string]any{"type": "device_command", "action": action,
 				"command_id": callID, "number_id": numberID})
 			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sent_to_device"})
 		}
@@ -248,14 +258,16 @@ func hostSelfCall(c *Conn, msg map[string]any) {
 	}
 
 	callID := newCallID()
+	action := deviceAction(msg)
 	hub.putCall(callID, &Call{
 		HostOID: c.id, NumberID: numberID, HostID: hostID, DeviceID: dev.Int64,
+		Action: action,
 	})
 	if d.sockE2EE {
 		d.send(map[string]any{"type": "sock_challenge_req",
 			"command_id": callID, "number_id": numberID})
 	} else {
-		d.send(map[string]any{"type": "device_command", "action": "open",
+		d.send(map[string]any{"type": "device_command", "action": action,
 			"command_id": callID, "number_id": numberID})
 	}
 	c.send(map[string]any{"type": "device_sent", "call_id": callID, "number_id": numberID})

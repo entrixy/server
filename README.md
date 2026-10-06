@@ -357,6 +357,21 @@ keys, revocation — but appear in the app by name, without marks of
 authenticity. Otherwise any server could pass itself off as a well-known
 company, and a person would have no way to check.
 
+## Controller presence
+
+A controller that loses power cannot say goodbye: the server learns about it
+from silence. Every controller says "I am alive" every `DEVICE_PING_S` seconds
+— the server tells it the period when it connects — and the server drops it
+after three missed signals. So a controller without power shows offline in the
+app after about three times `DEVICE_PING_S`.
+
+The default is 30 seconds: offline after about a minute and a half, and almost
+no traffic even with thousands of controllers. With a few dozen you can set 10
+and see the change in half a minute. Lower than 5 makes no sense: on a weak
+Wi-Fi a lost signal or two is normal, and the indicator would flicker for no
+reason. Controllers with firmware older than 2026-10-06 do not take the period
+from the server; they keep their 30 seconds and are judged by that.
+
 ## Request limits
 
 Every endpoint has a ceiling, and it is applied the moment a request arrives

@@ -34,6 +34,9 @@ type Conn struct {
 	appClient bool
 	sockE2EE  bool
 	lastPong  time.Time
+	// A controller's keepalive period in seconds: the server's own setting for
+	// firmware that follows it, 30 for older firmware that pings on its own.
+	pingS int
 }
 
 func (c *Conn) send(v any) {
@@ -96,6 +99,10 @@ type Call struct {
 	NumberID  int64
 	HostID    int64
 	DeviceID  int64
+	// What a controller is asked to do: "open" or "close" (bistable). The
+	// caller decides, by the position it knows; for an encrypted controller it
+	// also signs that very action, so the server cannot swap it.
+	Action string
 }
 
 // Everyone currently connected. One lock guards the lot: the traffic here is a

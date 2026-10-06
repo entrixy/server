@@ -216,4 +216,7 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — открывайте шлагбаумы, ворота, замки и домофоны',
     'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => 'Управление доступом с телефона: открывайте шлагбаумы, ворота, замки и домофоны автоматически.',
     'Powered by Entrixy' => 'Работает на Entrixy',
+    'and open' => 'и откройте',
+    'and an' => 'и есть поле',
+    '. Here' => '. Здесь',
 ];

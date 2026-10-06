@@ -214,4 +214,7 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'This company has not confirmed a domain — there is only the name it entered. Grant access if you are sure who is asking.' => '这家公司没有确认域名——只有填写的名称。确定是谁在申请，再授予权限。',
     'The link is copied: after installation the app will pick it up itself, scanning again is not needed.' => '链接已复制：安装后应用会自己读取，无需再扫一次码。',
     'Powered by Entrixy' => '由 Entrixy 提供支持',
+    'and open' => '然后打开',
+    'and an' => '以及一个',
+    '. Here' => '。其中',
 ];

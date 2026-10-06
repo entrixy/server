@@ -24,7 +24,7 @@ func startTimers(ctx context.Context) {
 	go every(ctx, time.Hour, expireMessages)
 	go every(ctx, time.Hour, expireNonces)
 	go every(ctx, 10*time.Second, pingPhones)
-	go every(ctx, 30*time.Second, reapDevices)
+	go every(ctx, 5*time.Second, reapDevices)
 }
 
 func tableExists(name string) bool {
@@ -317,10 +317,17 @@ func pingPhones() {
 }
 
 // Controllers are not pinged: a fan-out to tens of thousands of boards does not
-// scale. A board reports in by itself and here we only close the silent.
+// scale. A board reports in by itself and here we only close the silent — after
+// three missed signals, so one lost packet on a weak Wi-Fi does not flap it.
 func reapDevices() {
 	for _, d := range hub.allDevices() {
-		if d.silentFor() > 90*time.Second {
+		d.mu.Lock()
+		p := d.pingS
+		d.mu.Unlock()
+		if p <= 0 {
+			p = 30
+		}
+		if d.silentFor() > time.Duration(3*p)*time.Second {
 			d.close()
 		}
 	}

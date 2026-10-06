@@ -24,6 +24,12 @@ type Config struct {
 	PromoBase       string `json:"promo_base_url"`
 	WebhookLog      string `json:"webhook_log"`
 	AccessCode      string `json:"access_code"`
+	// How often a controller says "I am alive", in seconds. The server drops a
+	// controller after three missed signals, so a board that lost power shows
+	// offline after about three times this. Lower is quicker for people and
+	// more traffic for the server: 30 suits thousands of boards, 10 a few
+	// dozen. 5..300.
+	DevicePingS int `json:"device_ping_s"`
 }
 
 func loadConfig() Config {
@@ -47,6 +53,7 @@ func loadConfig() Config {
 		PromoBase:       env("PROMO_BASE_URL", ""),
 		WebhookLog:      env("WEBHOOK_LOG", ""),
 		AccessCode:      env("ACCESS_CODE", ""),
+		DevicePingS:     envInt("DEVICE_PING_S", 30),
 	}
 	if *path != "" {
 		b, err := os.ReadFile(*path)
@@ -65,6 +72,15 @@ func loadConfig() Config {
 	}
 	if c.RateLimitPerMin <= 0 {
 		c.RateLimitPerMin = 60
+	}
+	if c.DevicePingS == 0 {
+		c.DevicePingS = 30
+	}
+	if c.DevicePingS < 5 {
+		c.DevicePingS = 5
+	}
+	if c.DevicePingS > 300 {
+		c.DevicePingS = 300
 	}
 	return c
 }

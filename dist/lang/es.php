@@ -214,4 +214,7 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'This company has not confirmed a domain — there is only the name it entered. Grant access if you are sure who is asking.' => 'Esta empresa no ha confirmado un dominio: solo está el nombre indicado. Concede el acceso si sabes quién lo pide.',
     'The link is copied: after installation the app will pick it up itself, scanning again is not needed.' => 'El enlace está copiado: tras la instalación la aplicación lo recogerá sola, no hace falta volver a escanear.',
     'Powered by Entrixy' => 'Funciona con Entrixy',
+    'and open' => 'y abra',
+    'and an' => 'vacío y un campo',
+    '. Here' => '. Aquí',
 ];
