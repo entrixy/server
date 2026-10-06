@@ -36,6 +36,12 @@ every five seconds. Firmware that follows it says `"ping_ctl":true` in
 presence" in the README. Rebuild the service binary and add the setting to
 `.env` if you want a value other than 30.
 
+**An automatic press only opens an open/close webhook.** A guest's or the
+owner's press triggered by a geofence, Wi-Fi or time sends `"action":"open"`
+instead of `"toggle"`: the server opens and remembers the position, and passes
+the explicit open on to the owner's phone in `do_webhook`. A manual press still
+toggles. Rebuild the service binary.
+
 ## 2026-10-05
 
 **A greeting that comes too soon waits instead of losing the link.** One

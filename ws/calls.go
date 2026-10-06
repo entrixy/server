@@ -153,7 +153,7 @@ func guestCall(c *Conn, msg map[string]any) {
 		// The owner's phone resolves "toggle" itself, by the position it holds.
 		dw := map[string]any{"type": "do_webhook", "call_id": callID,
 			"number_id": numberID, "user_key_id": userKeyID}
-		if a := str(msg, "action"); a == "toggle" || a == "close" {
+		if a := str(msg, "action"); a == "toggle" || a == "close" || a == "open" {
 			dw["action"] = a
 		}
 		h.send(dw)
@@ -370,6 +370,10 @@ func resolveWebhookAction(numID int64, requested string) (string, bool) {
 	switch requested {
 	case "close":
 		return "close", true
+	// An explicit open comes only from an open/close object whose press was
+	// automatic (geofence, Wi-Fi, time): open, and remember the position.
+	case "open":
+		return "open", true
 	case "toggle":
 		var last sql.NullString
 		queryRow(`SELECT last_state FROM numbers WHERE id = ?`, numID).Scan(&last)
