@@ -3,6 +3,17 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-13
+
+**Every guest of an object sees what the controller says about it.** Moving
+("Opening"), its outcome ("Opened", "Did not open") and the board's own events
+used to reach only the owner and the guest who pressed; now every guest holding
+the object gets them, whoever pressed — the owner, another guest or a guest's
+guest. To those who did not press, the message carries `"other":true`: the app
+shows it on the card without a sound and without touching its own log. A reply
+that concerns one press only (busy, refused) still goes to the one who pressed.
+Rebuild the service binary; app 10.35.
+
 ## 2026-10-11
 
 **A deleted object leaves the guests' keys properly.** Deleting an object

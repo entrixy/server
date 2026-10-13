@@ -219,4 +219,6 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     '. Here' => '. Ici',
     'in' => 'dans',
     'Load' => 'Charger',
+    'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — ouvrez barrières, portails, serrures et interphones',
+    'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => 'Contrôle d’accès depuis votre téléphone : ouvrez barrières, portails, serrures et interphones automatiquement.',
 ];

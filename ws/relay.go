@@ -247,7 +247,9 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		}
 	}
 	devID := c.snapDeviceID()
-	toGuest := func(g *Conn) {
+	// other — the message is about a press of someone else: the guest shows it
+	// on the card, but it is not their own press for the log or the sound.
+	toGuest := func(g *Conn, other bool) {
 		gm := map[string]any{"type": "device_status", "call_id": commandID,
 			"number_id": numberID, "level": level, "message": message, "final": final}
 		if boolOf(msg, "hold", false) {
@@ -256,11 +258,17 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		if event != "" {
 			gm["event"] = event
 		}
+		if other {
+			gm["other"] = true
+		}
 		g.send(gm)
 	}
+	// The guest whose press this answers or ends.
+	var presser int64
 	if info != nil {
+		presser = info.GuestOID
 		if g := hub.guest(info.GuestOID); g != nil {
-			toGuest(g)
+			toGuest(g, false)
 		}
 		hub.stateMu.Lock()
 		if info.GuestOID != 0 {
@@ -277,8 +285,33 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		lp, ok := hub.lastPress[devID]
 		hub.stateMu.Unlock()
 		if ok && time.Since(lp.at) < 5*time.Minute {
+			presser = lp.guestOID
 			if g := hub.guest(lp.guestOID); g != nil {
-				toGuest(g)
+				toGuest(g, false)
+			}
+		}
+	}
+	// What happens to the object — moving, its outcome, the board's own events —
+	// every guest holding it sees, whoever pressed: the owner, another guest or
+	// a guest's guest. A reply that concerns one press only (busy, refused)
+	// stays with the one who pressed.
+	if message != "" && numberID != nil &&
+		(boolOf(msg, "hold", false) || event != "" || level == "success") {
+		if rows, ok := query(`SELECT DISTINCT user_key_id FROM key_numbers WHERE number_id = ?`, numberID); ok {
+			var keys []int64
+			for rows.Next() {
+				var k int64
+				if rows.Scan(&k) == nil {
+					keys = append(keys, k)
+				}
+			}
+			rows.Close()
+			for _, k := range keys {
+				for _, g := range hub.guestsOfKey(k) {
+					if g.id != presser {
+						toGuest(g, true)
+					}
+				}
 			}
 		}
 	}

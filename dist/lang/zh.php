@@ -218,7 +218,9 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'and an' => '以及一个',
     '. Here' => '。其中',
     ',' => '，',
-    'in' => '中发送',
+    'in' => '在',
     '.' => '。',
     'Load' => '加载',
+    'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — 打开道闸、大门、门锁和对讲',
+    'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => '用手机进行门禁管理：自动打开道闸、大门、门锁和对讲。',
 ];
