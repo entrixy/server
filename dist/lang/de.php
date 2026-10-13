@@ -217,4 +217,5 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'and open' => 'und öffnen Sie',
     'and an' => 'und ein Feld',
     '. Here' => '. Dabei ist',
+    'Load' => 'Laden',
 ];

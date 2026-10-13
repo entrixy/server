@@ -80,8 +80,11 @@ foreach ($keys as &$k) {
     // as pending and opens nothing.
     // A guest who passed the key on may change its objects later; the old
     // bundle keeps working until the owner assembles the new one.
-    $k['needs_bundle'] = ($k['parent_key_id'] !== null
-        && ($k['bundle_cipher'] === null || (int)$k['bundle_dirty'])) ? 1 : 0;
+    // A key issued straight from the owner needs reassembling when it lost an
+    // object (deleted, or taken out): its bundle still carries the object.
+    $k['needs_bundle'] = (($k['parent_key_id'] !== null
+        && ($k['bundle_cipher'] === null || (int)$k['bundle_dirty']))
+        || ($k['parent_key_id'] === null && (int)$k['bundle_dirty'])) ? 1 : 0;
     unset($k['bundle_dirty']);
     $k['native_only'] = (int)$k['native_only'];
     // The objects with their settings. Bluetooth locks sit in the same list on

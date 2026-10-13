@@ -217,4 +217,6 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'and open' => 'e abra',
     'and an' => 'vazio e um campo',
     '. Here' => '. Aqui',
+    'in' => 'no',
+    'Load' => 'Carregar',
 ];

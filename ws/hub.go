@@ -34,9 +34,23 @@ type Conn struct {
 	appClient bool
 	sockE2EE  bool
 	lastPong  time.Time
-	// A controller's keepalive period in seconds: the server's own setting for
-	// firmware that follows it, 30 for older firmware that pings on its own.
-	pingS int
+	// Seconds of silence after which a controller is dropped: the server's
+	// setting for firmware that takes its period from us, 90 for older
+	// firmware that pings every 30 s on its own.
+	offlineS int
+	// Why the connection ended, for the log: the first cause set wins.
+	reason string
+	since  time.Time
+	// A controller has reported its position on this connection already.
+	posSeen bool
+}
+
+func (c *Conn) setReason(r string) {
+	c.mu.Lock()
+	if c.reason == "" {
+		c.reason = r
+	}
+	c.mu.Unlock()
 }
 
 func (c *Conn) send(v any) {
@@ -55,6 +69,7 @@ func (c *Conn) sendRaw(b []byte) {
 		// The reader on the other end has stopped taking messages and the queue is
 		// full: the connection is dead in all but name, so it is dropped rather
 		// than allowed to hold memory.
+		c.setReason("send queue full")
 		c.close()
 	}
 }
@@ -123,6 +138,16 @@ type Hub struct {
 	// Every command-driven change of an object's position bumps its counter, so
 	// a pending auto-close knows whether someone has pressed since.
 	stateGen map[int64]int64
+	// The guest whose press last moved a controller: the limit switch reports
+	// the end of that movement later, with no command behind it, and the guest
+	// should see it too ("Opened", "Did not open").
+	lastPress map[int64]guestPress
+}
+
+type guestPress struct {
+	guestOID int64
+	numberID any
+	at       time.Time
 }
 
 func newHub() *Hub {
@@ -134,6 +159,7 @@ func newHub() *Hub {
 		lastHello: map[string]time.Time{},
 		lastState: map[int64]time.Time{},
 		stateGen:  map[int64]int64{},
+		lastPress: map[int64]guestPress{},
 	}
 }
 

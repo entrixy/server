@@ -14,8 +14,14 @@ func deviceAction(msg map[string]any) string {
 	return "open"
 }
 
+// opening / closing: a controller with a limit switch between the pulse and
+// the switch confirming.
 func validPosition(p string) bool {
-	return p == "open" || p == "closed" || p == "unknown"
+	switch p {
+	case "open", "closed", "opening", "closing", "unknown":
+		return true
+	}
+	return false
 }
 
 // ── A guest opens something ─────────────────────────────────────────────────
@@ -395,7 +401,11 @@ func setObjectState(hostID, numID int64, position string, force bool) bool {
 		Scan(&last, &owner); err != nil {
 		return false
 	}
-	if owner != hostID || last.String == position {
+	if owner != hostID {
+		return false
+	}
+	if last.String == position {
+		log.Printf("state %d: %s again, nothing to send", numID, position)
 		return false
 	}
 
@@ -403,11 +413,13 @@ func setObjectState(hostID, numID int64, position string, force bool) bool {
 	hub.stateMu.Lock()
 	if !force && time.Since(hub.lastState[numID]) < 5*time.Second {
 		hub.stateMu.Unlock()
+		log.Printf("state %d: %s -> %s held back, a change less than 5 s ago", numID, last.String, position)
 		return false
 	}
 	hub.lastState[numID] = time.Now()
 	hub.stateMu.Unlock()
 
+	log.Printf("state %d: %s -> %s (force=%v)", numID, last.String, position, force)
 	exec(`UPDATE numbers SET last_state = ?, last_state_at = NOW() WHERE id = ?`, position, numID)
 	payload := map[string]any{
 		"type": "obj_state_update", "num_id": numID,

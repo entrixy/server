@@ -16,6 +16,7 @@ func startTimers(ctx context.Context) {
 	go every(ctx, 30*time.Second, evictMovedOwners)
 	go every(ctx, time.Second, pumpPendingActions)
 	go every(ctx, time.Second, pumpNotifications)
+	go every(ctx, 2*time.Second, pumpHostQueue)
 	// Banners are ours alone: a server standing on its own has no such table,
 	// and there is nothing to ask it for.
 	if tableExists("promo") {
@@ -24,7 +25,7 @@ func startTimers(ctx context.Context) {
 	go every(ctx, time.Hour, expireMessages)
 	go every(ctx, time.Hour, expireNonces)
 	go every(ctx, 10*time.Second, pingPhones)
-	go every(ctx, 5*time.Second, reapDevices)
+	go every(ctx, time.Second, reapDevices)
 }
 
 func tableExists(name string) bool {
@@ -317,17 +318,18 @@ func pingPhones() {
 }
 
 // Controllers are not pinged: a fan-out to tens of thousands of boards does not
-// scale. A board reports in by itself and here we only close the silent — after
-// three missed signals, so one lost packet on a weak Wi-Fi does not flap it.
+// scale. A board reports in by itself, three times per offline period, and here
+// we only close the silent — once a second, so the offline time holds to it.
 func reapDevices() {
 	for _, d := range hub.allDevices() {
 		d.mu.Lock()
-		p := d.pingS
+		p := d.offlineS
 		d.mu.Unlock()
 		if p <= 0 {
-			p = 30
+			p = 90
 		}
-		if d.silentFor() > time.Duration(3*p)*time.Second {
+		if s := d.silentFor(); s > time.Duration(p)*time.Second {
+			d.setReason("silent " + s.Round(time.Second).String())
 			d.close()
 		}
 	}
@@ -340,4 +342,27 @@ func first(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// Messages queued for an owner by the web half (a guest's bundle to reassemble
+// after an object was deleted or taken out of a key) used to wait for the
+// owner's next connect. An owner online gets them within two seconds.
+func pumpHostQueue() {
+	rows, ok := query(`SELECT DISTINCT host_id FROM pending_host_msgs LIMIT 100`)
+	if !ok {
+		return
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	rows.Close()
+	for _, id := range ids {
+		if h := hub.host(id); h != nil {
+			flushHostQueue(h, id)
+		}
+	}
 }

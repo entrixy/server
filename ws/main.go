@@ -123,6 +123,7 @@ func readLoop(ctx context.Context, c *Conn) {
 	for {
 		typ, data, err := c.ws.Read(ctx)
 		if err != nil {
+			c.setReason("read: " + err.Error())
 			return
 		}
 		if typ != websocket.MessageText {
@@ -184,9 +185,18 @@ func onClose(c *Conn) {
 			delete(hub.devices, devID)
 		}
 		hub.mu.Unlock()
+		c.mu.Lock()
+		reason, since := c.reason, c.since
+		c.mu.Unlock()
 		if !current {
+			// The board is already back on a new connection: the old one
+			// lingered until the proxy noticed it was dead.
+			log.Printf("controller %d stale connection closed after %s: %s", devID,
+				time.Since(since).Round(time.Second), reason)
 			return
 		}
+		log.Printf("controller %d offline after %s: %s", devID,
+			time.Since(since).Round(time.Second), reason)
 		exec(`UPDATE devices SET last_seen = NOW() WHERE id = ?`, devID)
 		msg, _ := json.Marshal(map[string]any{
 			"type": "device_online", "device_id": devID, "online": false,

@@ -28,8 +28,8 @@ $GLOBALS['ws_host'] = envv('WS_HOST', '0.0.0.0');
 $GLOBALS['ws_port'] = (int)envv('WS_PORT', '8095');
 
 $GLOBALS['rate_limit_per_min'] = (int)envv('RATE_LIMIT_PER_MIN', '60');
-// How often a controller says "I am alive", seconds: offline after ~3× this.
-$GLOBALS['device_ping_s']      = (int)envv('DEVICE_PING_S', '30');
+// Seconds of silence after which a controller shows offline.
+$GLOBALS['device_offline_s']   = (int)envv('DEVICE_OFFLINE_S', '30');
 // The ceiling on requests to one endpoint from one address per minute.
 $GLOBALS['requests_per_min']   = (int)envv('REQUESTS_PER_MIN', 300);
 

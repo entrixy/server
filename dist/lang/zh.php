@@ -217,4 +217,8 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'and open' => '然后打开',
     'and an' => '以及一个',
     '. Here' => '。其中',
+    ',' => '，',
+    'in' => '中发送',
+    '.' => '。',
+    'Load' => '加载',
 ];

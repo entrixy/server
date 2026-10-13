@@ -3,7 +3,85 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-11
+
+**A deleted object leaves the guests' keys properly.** Deleting an object
+used to strike it from the keys silently: a guest kept a Bluetooth lock that
+was no longer theirs, and a key left with nothing stayed alive. Now the keys
+that held it are handled as when the object is taken out of a key: a key with
+nothing left is revoked with its branch, the rest are marked for a new bundle
+and the owner is asked to reassemble it (`key_objects_lost()` in
+`lib/key_objects.php`). `host_sync` reports `needs_bundle` for the owner's own
+keys too when their bundle is stale; app 10.21 reassembles it.
+
+**Messages queued for an owner arrive while the owner is online.** They used to
+wait for the owner's next connect; now the service hands them over within two
+seconds. Rebuild the service binary.
+
+**A Bluetooth lock with a limit switch answers "opening" or "closing".** The
+reply to a press is `0x32`/`0x33` while the switch has not confirmed it, no
+longer "open" at once. The phone that pressed — owner, guest or a guest's guest
+— follows the advertisement and shows the outcome itself; the owner's journal
+row of that press turns into the outcome. Reflash Bluetooth controllers; app 10.25.
+
+## 2026-10-09
+
+**A controller with a limit switch reports the way, not only the end.** From
+the pulse until the switch confirms, the position is `opening` or `closing`;
+the server takes both and hands them to phones like any other position. When
+the switch confirms, the event carries `"confirm":true` and the server passes
+it on: the app updates the press in the log instead of adding a line. A drive
+that does not get there within two minutes ends in `"level":"danger"`, "Did
+not close" or "Did not open", and auto-close does not retry. Firmware and the
+app (10.15) from this date; rebuild the service binary. The column that keeps
+the position takes the two new values; a running server widens it by hand —
+the start-up check adds columns but does not reshape them:
+
+```sql
+ALTER TABLE numbers MODIFY last_state
+  ENUM('open','closed','opening','closing','unknown') DEFAULT NULL;
+```
+
+**The controller decides how long its message stays on the card.** A
+`device_status` with `"hold":true` stays until the controller's next message;
+without it the app hides it after a few seconds. The server passes the flag
+on to the owner and to the guest whose press it answers. Controllers set it for
+"Opening" / "Closing" (level `info`) and for a failure. Rebuild the service
+binary; app 10.16.
+
+**The guest sees how the movement they started ended.** A limit-switch
+message with no command behind it ("Opened", "Did not open") goes to the
+owner and, for five minutes after a guest's press on that controller, to that
+guest too. Rebuild the service binary; app 10.19.
+
+**The first position after a connect is never held back.** The five-second
+limit on positions used to drop a board's first report after a reboot when
+another change came shortly before it, and phones kept the old position.
+
+**The log shows every position change** and the ones held back:
+`state N: open -> closed (force=…)`.
+
+## 2026-10-07
+
+**`DEVICE_PING_S` is now `DEVICE_OFFLINE_S`, and means what it says:** the
+seconds of silence after which a controller shows offline. The controller is
+told a third of it as its "I am alive" period, and the server checks every
+second instead of every five. Rename the setting in `.env` (it was a period;
+the old 10 matches a new 30) and rebuild the service binary. Firmware from
+this date accepts a period down to one second; reflash the controllers if you
+set less than 15.
+
 ## 2026-10-06
+
+**The log says when a controller comes and goes, and why.** Each greeting
+writes `controller N online (e2ee=…, ping Ns)`, each loss `controller N
+offline after <time>: <reason>` — silent for so long, a full send queue or the
+read error. Rebuild the service binary.
+
+**Controller firmware does not stop for a pulse.** The relay is switched off
+from the main loop instead of after a wait, so the link keeps being served; a
+command that arrives during a pulse is answered `Busy, try again` instead of
+being queued. Reflash the controllers.
 
 **A bound controller can close.** A bistable controller that is bound to the
 app used to open on every signed press: `sock_fire` carried no action. Now a

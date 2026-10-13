@@ -220,8 +220,19 @@ function key_obj_enforce(int $keyId): array {
             ->execute(['key_updated', $k]);
     }
 
-    // What the keys that lost objects become.
-    foreach (array_keys($touched) as $k) {
+    $revoked = array_merge($revoked, key_objects_lost(array_keys($touched)));
+    return $revoked;
+}
+
+// What keys that lost objects become: a key with nothing left is revoked with
+// its branch; the rest are told, and the owner is asked to reassemble their
+// bundles without the object — otherwise a guest keeps a Bluetooth lock that
+// is no longer theirs. Returns the revoked key ids.
+function key_objects_lost(array $keyIds): array {
+    require_once __DIR__ . '/key_tree.php';
+    $revoked = [];
+    foreach ($keyIds as $k) {
+        $k = (int)$k;
         $left = db()->prepare('SELECT COUNT(*) FROM key_numbers WHERE user_key_id = ?');
         $left->execute([$k]);
         $alive = db()->prepare('SELECT id, host_id, parent_key_id FROM user_keys WHERE id = ?');

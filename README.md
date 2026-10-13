@@ -360,17 +360,16 @@ company, and a person would have no way to check.
 ## Controller presence
 
 A controller that loses power cannot say goodbye: the server learns about it
-from silence. Every controller says "I am alive" every `DEVICE_PING_S` seconds
-— the server tells it the period when it connects — and the server drops it
-after three missed signals. So a controller without power shows offline in the
-app after about three times `DEVICE_PING_S`.
+from silence. `DEVICE_OFFLINE_S` is how many seconds of silence turn a
+controller offline in the app. The controller says "I am alive" three times as
+often — the server tells it the period when it connects — so one signal lost on
+a weak Wi-Fi does not flip the indicator. The server checks every second.
 
-The default is 30 seconds: offline after about a minute and a half, and almost
-no traffic even with thousands of controllers. With a few dozen you can set 10
-and see the change in half a minute. Lower than 5 makes no sense: on a weak
-Wi-Fi a lost signal or two is normal, and the indicator would flicker for no
-reason. Controllers with firmware older than 2026-10-06 do not take the period
-from the server; they keep their 30 seconds and are judged by that.
+The default is 30 seconds, with almost no traffic even with thousands of
+controllers. With a few dozen you can set 10. Lower than 5 makes no sense: the
+indicator would flicker on any Wi-Fi hiccup. Controllers with firmware older
+than 2026-10-06 do not take the period from the server; they keep pinging every
+30 seconds and go offline after 90.
 
 ## Request limits
 

@@ -172,7 +172,7 @@ CREATE TABLE `numbers` (
   `device_id` int(10) unsigned DEFAULT NULL,
   `data_cipher` text DEFAULT NULL,
   `data_cipher_updated` datetime DEFAULT NULL,
-  `last_state` enum('open','closed','unknown') DEFAULT NULL,
+  `last_state` enum('open','closed','opening','closing','unknown') DEFAULT NULL,
   `last_state_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `host_id` (`host_id`)

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
 )
 
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
@@ -139,11 +141,22 @@ func deviceHello(c *Conn, msg map[string]any) {
 	c.sockE2EE = boolOf(msg, "e2ee", false)
 	// Firmware that takes its keepalive period from the server says so; older
 	// boards ping every 30 s whatever we tell them, and are judged by that.
-	c.pingS = 30
+	c.offlineS = 90
 	if boolOf(msg, "ping_ctl", false) {
-		c.pingS = cfg.DevicePingS
+		c.offlineS = cfg.DeviceOfflineS
 	}
+	c.since = time.Now()
+	offlineS, e2ee := c.offlineS, c.sockE2EE
 	c.mu.Unlock()
+	// The board's own account of itself: last reboot reason, uptime, link
+	// drops, Wi-Fi signal. Tells a reboot apart from a dropped link.
+	diag := ""
+	if d, ok := msg["diag"]; ok {
+		if b, err := json.Marshal(d); err == nil {
+			diag = " " + string(b)
+		}
+	}
+	log.Printf("controller %d online (e2ee=%v, offline after %ds)%s", id, e2ee, offlineS, diag)
 	hub.mu.Lock()
 	hub.devices[id] = c
 	hub.mu.Unlock()
@@ -151,7 +164,7 @@ func deviceHello(c *Conn, msg map[string]any) {
 	exec(`UPDATE devices SET last_seen = NOW() WHERE id = ?`, id)
 	// hb_interval — how often the board should report in. Fixed for now; with
 	// many boards it becomes a function of their number.
-	c.send(map[string]any{"type": "device_ok", "hb_interval": 300, "ping_s": cfg.DevicePingS})
+	c.send(map[string]any{"type": "device_ok", "hb_interval": 300, "ping_s": cfg.devicePingS()})
 
 	// Catch up on revocations accumulated while the board was offline. It
 	// applies them by version and ignores the stale ones.
@@ -233,10 +246,40 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			numberID = nid
 		}
 	}
+	devID := c.snapDeviceID()
+	toGuest := func(g *Conn) {
+		gm := map[string]any{"type": "device_status", "call_id": commandID,
+			"number_id": numberID, "level": level, "message": message, "final": final}
+		if boolOf(msg, "hold", false) {
+			gm["hold"] = true
+		}
+		if event != "" {
+			gm["event"] = event
+		}
+		g.send(gm)
+	}
 	if info != nil {
 		if g := hub.guest(info.GuestOID); g != nil {
-			g.send(map[string]any{"type": "device_status", "call_id": commandID,
-				"number_id": numberID, "level": level, "message": message, "final": final})
+			toGuest(g)
+		}
+		hub.stateMu.Lock()
+		if info.GuestOID != 0 {
+			hub.lastPress[devID] = guestPress{guestOID: info.GuestOID, numberID: numberID, at: time.Now()}
+		} else {
+			delete(hub.lastPress, devID) // the owner pressed since
+		}
+		hub.stateMu.Unlock()
+	} else if event == "limit" && message != "" {
+		// The end of a movement a guest's press started: confirmed or failed.
+		// The travel time is capped at two minutes; a failure may come up to
+		// twice that after the press.
+		hub.stateMu.Lock()
+		lp, ok := hub.lastPress[devID]
+		hub.stateMu.Unlock()
+		if ok && time.Since(lp.at) < 5*time.Minute {
+			if g := hub.guest(lp.guestOID); g != nil {
+				toGuest(g)
+			}
 		}
 	}
 	// The owner hears about everything, bound commands and spontaneous events
@@ -256,9 +299,19 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			"silent": guestInit || event != ""}
 		if event != "" {
 			out["event"] = event
+			// The limit switch confirmed a movement a press started: the app
+			// updates that press in the log instead of adding a line.
+			if boolOf(msg, "confirm", false) {
+				out["confirm"] = true
+			}
 		}
 		if info != nil && info.Action != "" {
 			out["action"] = info.Action
+		}
+		// The controller asks to keep the message on the card until its next
+		// one ("Opening", a failure) rather than hide it after a few seconds.
+		if boolOf(msg, "hold", false) {
+			out["hold"] = true
 		}
 		h.send(out)
 	}
@@ -276,7 +329,14 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			// switch, auto-close) is a real movement: no five-second limit,
 			// or a close right after an open never reaches the phones. Only
 			// the periodic heartbeat is throttled.
-			if info != nil || event != "" {
+			// The first position after a connect is the board's fresh account
+			// of itself (after a reboot or a gap): no limit either, or a change
+			// shortly before it would hide the truth from the phones.
+			c.mu.Lock()
+			first := !c.posSeen
+			c.posSeen = true
+			c.mu.Unlock()
+			if info != nil || event != "" || first {
 				applyCommandState(hid, nid, pos)
 			} else {
 				applyObjectState(hid, nid, pos)

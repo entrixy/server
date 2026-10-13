@@ -219,4 +219,6 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'and open' => 'и откройте',
     'and an' => 'и есть поле',
     '. Here' => '. Здесь',
+    'in' => 'в',
+    'Load' => 'Загрузить',
 ];
