@@ -337,6 +337,11 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			if boolOf(msg, "confirm", false) {
 				out["confirm"] = true
 			}
+			// The end of a guest's press: the owner logs it, but the failure
+			// sound belongs to the one who pressed.
+			if presser != 0 {
+				out["by_guest"] = true
+			}
 		}
 		if info != nil && info.Action != "" {
 			out["action"] = info.Action

@@ -14,6 +14,11 @@ shows it on the card without a sound and without touching its own log. A reply
 that concerns one press only (busy, refused) still goes to the one who pressed.
 Rebuild the service binary; app 10.35.
 
+**The owner is not woken by a guest's failure.** The end of a movement a
+guest's press started reaches the owner with `"by_guest":true`; the app logs
+it and shows it on the card but keeps the failure sound for the one who
+pressed. Rebuild the service binary; app 10.36.
+
 ## 2026-10-11
 
 **A deleted object leaves the guests' keys properly.** Deleting an object
