@@ -153,6 +153,7 @@ type Hub struct {
 
 type guestPress struct {
 	guestOID int64
+	keyID    int64 // the presser's key: the result finds them after a reconnect too
 	numberID any
 	at       time.Time
 }

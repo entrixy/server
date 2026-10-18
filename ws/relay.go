@@ -263,26 +263,27 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		}
 		g.send(gm)
 	}
-	// The guest whose press this answers or ends.
-	var presser int64
+	// The guest whose press this answers or ends, and their key.
+	var presser, pressKey int64
 	if info != nil {
 		presser = info.GuestOID
 		if g := hub.guest(info.GuestOID); g != nil {
 			toGuest(g, false)
 		}
-		// Only an accepted press starts a movement: "Busy" or a refusal must
-		// not take over the end of someone else's.
+		// Only a press that set the lock moving ("Opening", held until the limit
+		// switch speaks) waits for an end. "Busy", a refusal or "already open"
+		// must not take over the end of someone else's movement.
+		moving := boolOf(msg, "hold", false) && level != "warning" && level != "danger"
 		hub.stateMu.Lock()
-		if level == "warning" || level == "danger" {
-			// leave it to whoever started the movement
-		} else if info.GuestOID != 0 {
-			hub.lastPress[devID] = guestPress{guestOID: info.GuestOID, numberID: numberID, at: time.Now()}
-		} else {
+		if moving && info.GuestOID != 0 {
+			hub.lastPress[devID] = guestPress{guestOID: info.GuestOID, keyID: info.UserKeyID,
+				numberID: numberID, at: time.Now()}
+		} else if moving {
 			delete(hub.lastPress, devID) // the owner pressed since
 		}
 		hub.stateMu.Unlock()
 	} else if event == "button" || event == "auto" ||
-		(event == "limit" && !boolOf(msg, "confirm", false) && !boolOf(msg, "hold", false)) {
+		(event == "limit" && !boolOf(msg, "confirm", false) && level != "danger") {
 		// The board moved on its own since — a button, auto-close, the door
 		// moved by hand: the next end of a movement is not that guest's.
 		hub.stateMu.Lock()
@@ -301,8 +302,19 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		hub.stateMu.Unlock()
 		if ok && time.Since(lp.at) < 5*time.Minute {
 			presser = lp.guestOID
-			if g := hub.guest(lp.guestOID); g != nil {
+			pressKey = lp.keyID
+			// To the presser's key, not the connection: they may have reconnected.
+			sent := false
+			for _, g := range hub.guestsOfKey(lp.keyID) {
 				toGuest(g, false)
+				if g.id == presser {
+					sent = true
+				}
+			}
+			if !sent {
+				if g := hub.guest(lp.guestOID); g != nil {
+					toGuest(g, false)
+				}
 			}
 		}
 	}
@@ -324,6 +336,9 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			}
 			rows.Close()
 			for _, k := range keys {
+				if pressKey != 0 && k == pressKey {
+					continue // already told it as their own
+				}
 				for _, g := range hub.guestsOfKey(k) {
 					if g.id != presser {
 						toGuest(g, true)
@@ -339,6 +354,9 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 	var keyID int64
 	if guestInit {
 		keyID = info.UserKeyID
+	} else if pressKey != 0 {
+		// The end of a guest's movement: the owner finds that guest's line by it.
+		keyID = pressKey
 	}
 	if h := hub.host(c.snapHostID()); h != nil {
 		out := map[string]any{"type": "device_status", "call_id": commandID,

@@ -5,6 +5,15 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**The end of a movement goes to the one who started it.** A press is recorded
+only when it set the lock moving (`hold`, not "Busy" or a refusal); the limit
+switch ends it only by confirming or failing; the result reaches every
+connection of the presser's key, and the owner gets that key (`user_key_id`).
+App 10.49. Socket firmware: works without Wi-Fi from boot, keeps a pulse short
+while the link is down, accepts a nonce for 30 s and only on its connection,
+never drops a revocation to make room. The configurator refuses flash pins,
+pins a board lacks and the H2 for the network controller.
+
 **The company key is taken when the client opens the request.** `company.php?a=invite`
 returns the domain key (`pubkey`); `host_sync` no longer hands out `org_pubkey`.
 A vouch is stored only for the keys it covers (`sign_pub`, `guest_pub` in
