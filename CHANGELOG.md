@@ -5,6 +5,14 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**The company key is taken when the client opens the request.** `company.php?a=invite`
+returns the domain key (`pubkey`); `host_sync` no longer hands out `org_pubkey`.
+A vouch is stored only for the keys it covers (`sign_pub`, `guest_pub` in
+`key_delegate?a=vouch`). Device status reaches only enabled keys; an owner's
+avatar and Bluetooth replies reach only that owner's guests; calls with no
+final status are swept after an hour; "Busy" no longer takes over the end of
+someone else's movement. App 10.48.
+
 **A company opens only with its signed request.** The company API refuses an
 opening without the domain signature (`sign_required`), and the cabinet no
 longer offers a test opening: the client's phone has nothing to check in either

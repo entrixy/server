@@ -153,8 +153,9 @@ owner's log as rejected.
 A company's opening arrives with the company's own signed request
 (`press: {org: {domain, ts, nonce, body, sig}}`, the material and key of the
 company API). The phone checks it with the company key it remembered when the
-company was given access, and checks that the request is an opening of this
-key and this object: `key_ref` is the key, `actor` is present (a signed
+owner opened the company's request (`pubkey` in `company.php?a=invite`) and
+bound to the key issued to it — never with a key from `host_sync`, and checks
+that the request is an opening of this key and this object: `key_ref` is the key, `actor` is present (a signed
 `objects` lookup has none, so it cannot pass for an opening), and `number_id`
 is this object or is left out for a key with a single object. A call that
 waits for the owner's "Allow" counts its checked signature once, for the same

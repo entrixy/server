@@ -122,6 +122,9 @@ type Call struct {
 	// or a webhook only when it matches, so it is passed on untouched: the
 	// server cannot make one up.
 	Press map[string]any
+	// When the call was registered: one that never gets a final status is
+	// swept after an hour.
+	at time.Time
 }
 
 // Everyone currently connected. One lock guards the lot: the traffic here is a
@@ -236,8 +239,24 @@ func (h *Hub) allDevices() []*Conn {
 
 func (h *Hub) putCall(id string, c *Call) {
 	h.mu.Lock()
+	if c.at.IsZero() {
+		c.at = time.Now()
+	}
 	h.calls[id] = c
 	h.mu.Unlock()
+}
+
+// Calls that never got a final status — a press the owner's phone refused, a
+// challenge the guest never answered — would otherwise stay for good.
+func expireCalls() {
+	cut := time.Now().Add(-time.Hour)
+	hub.mu.Lock()
+	for id, c := range hub.calls {
+		if c.at.Before(cut) {
+			delete(hub.calls, id)
+		}
+	}
+	hub.mu.Unlock()
 }
 
 func (h *Hub) call(id string) *Call {

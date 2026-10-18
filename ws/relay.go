@@ -270,8 +270,12 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		if g := hub.guest(info.GuestOID); g != nil {
 			toGuest(g, false)
 		}
+		// Only an accepted press starts a movement: "Busy" or a refusal must
+		// not take over the end of someone else's.
 		hub.stateMu.Lock()
-		if info.GuestOID != 0 {
+		if level == "warning" || level == "danger" {
+			// leave it to whoever started the movement
+		} else if info.GuestOID != 0 {
 			hub.lastPress[devID] = guestPress{guestOID: info.GuestOID, numberID: numberID, at: time.Now()}
 		} else {
 			delete(hub.lastPress, devID) // the owner pressed since
@@ -308,7 +312,9 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 	// stays with the one who pressed.
 	if message != "" && numberID != nil &&
 		(boolOf(msg, "hold", false) || event != "" || level == "success") {
-		if rows, ok := query(`SELECT DISTINCT user_key_id FROM key_numbers WHERE number_id = ?`, numberID); ok {
+		if rows, ok := query(`SELECT DISTINCT kn.user_key_id FROM key_numbers kn
+			JOIN user_keys uk ON uk.id = kn.user_key_id
+			WHERE kn.number_id = ? AND uk.enabled = 1 AND COALESCE(uk.mode, 'auto') <> 'off'`, numberID); ok {
 			var keys []int64
 			for rows.Next() {
 				var k int64
@@ -458,8 +464,9 @@ func avatarData(c *Conn, msg map[string]any) {
 	if numberID == 0 {
 		return
 	}
+	// Only to a guest of this owner: connection numbers are sequential.
 	g := hub.guest(num(msg, "guest_oid"))
-	if g == nil {
+	if g == nil || g.snapHostID() != c.snapHostID() {
 		return
 	}
 	payload := map[string]any{"type": "avatar_data", "number_id": numberID}
@@ -507,7 +514,7 @@ func bleTokenResponse(c *Conn, msg map[string]any) {
 	}
 	bleID := num(msg, "ble_id")
 	g := hub.guest(num(msg, "guest_oid"))
-	if g == nil {
+	if g == nil || g.snapHostID() != c.snapHostID() {
 		return
 	}
 	payload := map[string]any{"type": "ble_token_response", "ble_id": bleID}

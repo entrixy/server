@@ -411,8 +411,14 @@ if ($action === 'vouch') {
     $child = (int)($j['child_id'] ?? 0);
     $sig = (string)($j['sig'] ?? '');
     if ($child <= 0 || !preg_match('#^[A-Za-z0-9+/=]{80,100}$#', $sig)) jout(['error' => 'bad_input'], 400);
-    $u = db()->prepare('UPDATE user_keys SET vouch_sig = ? WHERE id = ? AND parent_key_id = ?');
-    $u->execute([$sig, $child, (int)$k['id']]);
+    // The signature covers particular keys: if the recipient opened the link again
+    // meanwhile, it is about the old ones and must not land on the new.
+    $signPub  = base64_decode(strtr((string)($j['sign_pub'] ?? ''), '-_', '+/'), true);
+    $guestPub = (string)($j['guest_pub'] ?? '');
+    if ($signPub === false || strlen($signPub) !== 32 || $guestPub === '') jout(['error' => 'bad_input'], 400);
+    $u = db()->prepare('UPDATE user_keys SET vouch_sig = ?
+                        WHERE id = ? AND parent_key_id = ? AND sign_pub = ? AND guest_pub = ?');
+    $u->execute([$sig, $child, (int)$k['id'], $signPub, $guestPub]);
     if ($u->rowCount() > 0) {
         db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('key_delegated', ?, NOW())")
             ->execute([$child]);

@@ -126,6 +126,9 @@ function org_public(array $o): array {
         'domain'   => $verified ? org_domain_display($o['domain']) : null,
         'verified' => $verified,
         'logo'     => ($verified && $o['logo_hash']) ? '/img/org/' . $o['logo_hash'] . '.png' : null,
+        // The domain key: the client's phone remembers it when the client opens
+        // the company's request, and checks every opening of that company with it.
+        'pubkey'   => $verified ? $o['pubkey'] : null,
     ];
 }
 

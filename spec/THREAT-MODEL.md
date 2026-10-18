@@ -43,9 +43,14 @@ phone through the server, but the phone trusts it only when whoever passed it on
 vouches for it with a signature the server cannot make (see "Vouching" in the
 guest protocol).
 
-One thing the operator must not be able to do is vouch for someone. That is why
-a company's key is fetched by the phone from the company's own domain, and why
-the badge of authenticity is shown only for records verified that way.
+One thing the operator must not be able to do is vouch for someone. A company is
+the one case where the phone takes the server's word once: the phone never
+contacts the company's domain (the company would see the client's address), so
+it remembers the domain key the server shows at the moment the owner opens the
+company's request, and binds it to the key issued to that company. After that
+the server cannot swap it, nor declare another key a company's. The badge of
+authenticity is shown only for records from the server the app was built for.
+A company that changes its domain key is granted access again.
 
 ## Someone holding the link
 

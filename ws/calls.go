@@ -330,7 +330,7 @@ func callStatus(c *Conn, msg map[string]any) {
 	if g := hub.guest(info.GuestOID); g != nil {
 		g.send(map[string]any{"type": "call_status", "call_id": callID, "status": status})
 	}
-	if status == "ended" || status == "error" {
+	if status == "ended" || status == "error" || status == "declined" {
 		hub.dropCall(callID)
 	}
 }

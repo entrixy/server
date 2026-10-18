@@ -72,9 +72,10 @@ foreach ($keys as &$k) {
     // A person compares the domain by eye with the company's site, so it goes out
     // as written rather than in punycode.
     elseif (function_exists('org_domain_display')) $k['org_domain'] = org_domain_display($k['org_domain']);
-    // The company's key: the owner's phone remembers it the first time it sees
-    // it and checks every request of that company against it.
-    $k['org_pubkey'] = $verified ? $k['org_pubkey'] : null;
+    // The company's key is not handed out here: the owner's phone takes it when
+    // the owner opens the company's request, so the server cannot declare any
+    // key a company's and slip in a key of its own.
+    unset($k['org_pubkey']);
     // The public half of the key's own signing pair. The owner's phone derives it
     // itself for keys it issued; for a key passed on it remembers this one.
     $k['sign_pub'] = $k['sign_pub'] !== null && $k['sign_pub'] !== ''

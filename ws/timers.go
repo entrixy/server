@@ -24,6 +24,7 @@ func startTimers(ctx context.Context) {
 	}
 	go every(ctx, time.Hour, expireMessages)
 	go every(ctx, time.Hour, expireNonces)
+	go every(ctx, time.Minute, expireCalls)
 	go every(ctx, 10*time.Second, pingPhones)
 	go every(ctx, time.Second, reapDevices)
 }
