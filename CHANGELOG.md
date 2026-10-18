@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**A press waits for the end of a movement only if it started one.** The
+controller marks such a reply `"started":true`; the worker records the press
+only then. A log upload's device name can no longer leave the logs folder; a
+company callback follows no redirects; the PWA's old sign-in endpoints are gone.
+App 10.50.
+
 **The end of a movement goes to the one who started it.** A press is recorded
 only when it set the lock moving (`hold`, not "Busy" or a refusal); the limit
 switch ends it only by confirming or failing; the result reaches every

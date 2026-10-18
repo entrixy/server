@@ -270,10 +270,12 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		if g := hub.guest(info.GuestOID); g != nil {
 			toGuest(g, false)
 		}
-		// Only a press that set the lock moving ("Opening", held until the limit
-		// switch speaks) waits for an end. "Busy", a refusal or "already open"
-		// must not take over the end of someone else's movement.
-		moving := boolOf(msg, "hold", false) && level != "warning" && level != "danger"
+		// Only a press that set the lock moving waits for an end: the controller
+		// marks the reply to a command that really pulsed ("started") and holds
+		// the message until the limit switch speaks. "Busy", a refusal or
+		// "already opening" from a second press must not take over the end of
+		// someone else's movement.
+		moving := boolOf(msg, "started", false) && boolOf(msg, "hold", false)
 		hub.stateMu.Lock()
 		if moving && info.GuestOID != 0 {
 			hub.lastPress[devID] = guestPress{guestOID: info.GuestOID, keyID: info.UserKeyID,

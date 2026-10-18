@@ -167,6 +167,10 @@ function org_callback(int $orgId, string $event, array $data = []): void {
                 'content' => $body,
                 'timeout' => 3,
                 'ignore_errors' => true,
+                // The host is checked, not where a redirect would take us: an
+                // answer "302 → 127.0.0.1" must not reach inside the server.
+                'follow_location' => 0,
+                'max_redirects' => 0,
             ],
             'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
         ]);
