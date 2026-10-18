@@ -5,6 +5,18 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**The worker holds each connection to its place.** A guest's key is checked on
+every press (enabled, not expired), not only at hello. Each connection is paced
+(ten messages a second for guests and controllers, fifty for owners; a guest's
+message is at most 256 KB), must say hello within fifteen seconds, and an
+owner's or controller's previous connection is closed when a new one registers.
+An owner greeting without a fingerprint is refused once the access is bound to
+one. A call's status and a webhook's result are accepted only from the owner the
+call went to. The owner's queue is flushed once at a time and a row is deleted
+only after it was handed over. Owners open their own objects through the server
+at most twenty times a minute. The browser client escapes every value it puts
+into the page and takes object numbers only as numbers. App 10.51.
+
 **A press waits for the end of a movement only if it started one.** The
 controller marks such a reply `"started":true`; the worker records the press
 only then. A log upload's device name can no longer leave the logs folder; a

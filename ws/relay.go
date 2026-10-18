@@ -158,8 +158,13 @@ func deviceHello(c *Conn, msg map[string]any) {
 	}
 	log.Printf("controller %d online (e2ee=%v, offline after %ds)%s", id, e2ee, offlineS, diag)
 	hub.mu.Lock()
+	prevDev := hub.devices[id]
 	hub.devices[id] = c
 	hub.mu.Unlock()
+	if prevDev != nil && prevDev != c {
+		prevDev.setReason("replaced by a new connection")
+		prevDev.close()
+	}
 
 	exec(`UPDATE devices SET last_seen = NOW() WHERE id = ?`, id)
 	// hb_interval — how often the board should report in. Fixed for now; with
@@ -441,8 +446,11 @@ func webhookResult(c *Conn, msg map[string]any) {
 		}
 	}
 	info := hub.call(callID)
-	if info == nil {
+	if info == nil || info.HostID != c.snapHostID() {
 		return
+	}
+	if len(message) > 200 {
+		message = message[:200]
 	}
 	if g := hub.guest(info.GuestOID); g != nil {
 		g.send(map[string]any{"type": "device_status", "call_id": callID,

@@ -77,10 +77,48 @@ func handleMessage(c *Conn, data []byte) {
 	}
 	typ := str(msg, "type")
 
+	// Pace per connection. The owner's phone relays for all its guests and gets
+	// more room; a guest, a controller or a stranger — ten a second, bursts to
+	// forty. Over the limit the message is dropped; a connection that keeps
+	// pushing is closed.
+	rate, burst := 10.0, 40.0
+	if c.snapRole() == "host" {
+		rate, burst = 50.0, 200.0
+	} else if len(data) > 256<<10 {
+		c.setReason("message too large")
+		c.close()
+		return
+	}
+	now0 := time.Now()
+	if c.rateAt.IsZero() {
+		c.rateTokens = burst
+	} else {
+		c.rateTokens += now0.Sub(c.rateAt).Seconds() * rate
+		if c.rateTokens > burst {
+			c.rateTokens = burst
+		}
+	}
+	c.rateAt = now0
+	if c.rateTokens < 1 {
+		c.rateDrops++
+		if c.rateDrops > 200 {
+			c.setReason("flood")
+			c.close()
+		}
+		return
+	}
+	c.rateTokens--
+	c.rateDrops = 0
+
 	if typ == "host_hello" || typ == "guest_hello" {
 		key := "h:" + str(msg, "device_id")
 		if typ == "guest_hello" {
 			key = "g:" + str(msg, "key_id")
+		}
+		// The key goes into a table: a real id is short, a long one is junk.
+		if len(key) > 80 {
+			c.close()
+			return
 		}
 		hub.helloMu.Lock()
 		prev := hub.lastHello[key]
@@ -204,19 +242,27 @@ func hostHello(c *Conn, msg map[string]any) {
 	c.mu.Unlock()
 
 	// Moving to another phone: the new handset took the access and this one is
-	// the old one. We say so here rather than waiting to be asked. An empty
-	// fingerprint belongs to an older client that knows nothing of this.
+	// the old one. We say so here rather than waiting to be asked. A greeting
+	// without a fingerprint is refused once the access is bound to one: leaving
+	// the field out must not get the old handset (or a copied secret) back in.
 	// Checked before registering: the old phone must not take the place of
 	// the new one, even for the moment until it is closed.
-	if fp != "" && boundFP.String != "" && !hmac.Equal([]byte(boundFP.String), []byte(fp)) {
+	if boundFP.String != "" && (fp == "" || !hmac.Equal([]byte(boundFP.String), []byte(fp))) {
 		log.Printf("evicted on connect: host %d, fingerprint %.10s", id, fp)
 		c.sendThenClose(map[string]any{"type": "evicted"})
 		return
 	}
 
+	// One connection per owner: the previous one (a replaced handset, a dead
+	// socket) is closed, or it would keep the owner's powers unwatched.
 	hub.mu.Lock()
+	prevHost := hub.hosts[id]
 	hub.hosts[id] = c
 	hub.mu.Unlock()
+	if prevHost != nil && prevHost != c {
+		prevHost.setReason("replaced by a new connection")
+		prevHost.close()
+	}
 
 	exec(`UPDATE hosts SET last_seen = NOW(),
 	      fcm_token = COALESCE(NULLIF(?, ''), fcm_token) WHERE id = ?`, fcm, id)

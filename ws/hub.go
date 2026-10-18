@@ -38,6 +38,13 @@ type Conn struct {
 	// setting for firmware that takes its period from us, 90 for older
 	// firmware that pings every 30 s on its own.
 	offlineS int
+	// Messages allowed right now (a token bucket, read loop only): a flood from
+	// one connection must not fill the owner's queue and push the owner off.
+	rateTokens float64
+	rateAt     time.Time
+	rateDrops  int
+	selfWindow time.Time
+	selfCount  int
 	// Why the connection ended, for the log: the first cause set wins.
 	reason string
 	since  time.Time
@@ -61,16 +68,23 @@ func (c *Conn) send(v any) {
 	c.sendRaw(b)
 }
 
-func (c *Conn) sendRaw(b []byte) {
+func (c *Conn) sendRaw(b []byte) { c.trySend(b) }
+
+// trySend reports whether the frame was queued: a stored message is deleted
+// only once it really left.
+func (c *Conn) trySend(b []byte) bool {
 	select {
 	case c.out <- b:
+		return true
 	case <-c.closed:
+		return false
 	default:
 		// The reader on the other end has stopped taking messages and the queue is
 		// full: the connection is dead in all but name, so it is dropped rather
 		// than allowed to hold memory.
 		c.setReason("send queue full")
 		c.close()
+		return false
 	}
 }
 

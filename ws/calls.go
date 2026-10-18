@@ -3,8 +3,21 @@ package main
 import (
 	"database/sql"
 	"log"
+	"sync"
 	"time"
 )
+
+// selfOpenAllowed paces an owner opening their own objects through the server:
+// twenty a minute is far beyond any hand, and keeps the server from becoming a
+// source of requests to any address the owner names.
+func selfOpenAllowed(c *Conn) bool {
+	now := time.Now()
+	if now.Sub(c.selfWindow) > time.Minute {
+		c.selfWindow, c.selfCount = now, 0
+	}
+	c.selfCount++
+	return c.selfCount <= 20
+}
 
 // The action for a controller: "close" only when asked for, anything else opens.
 func deviceAction(msg map[string]any) string {
@@ -36,8 +49,16 @@ func guestCall(c *Conn, msg map[string]any) {
 
 	var mode sql.NullString
 	var forceBusy sql.NullInt64
-	queryRow(`SELECT mode, force_when_busy FROM user_keys WHERE id = ?`, userKeyID).
-		Scan(&mode, &forceBusy)
+	// The key as it is now, not as it was at hello: a connection outlives an
+	// expiry or a switch-off. No row — the key is gone.
+	var live int
+	if err := queryRow(`SELECT mode, force_when_busy,
+	                           (enabled = 1 AND (expires_at IS NULL OR expires_at > NOW())) AS live
+	                    FROM user_keys WHERE id = ?`, userKeyID).
+		Scan(&mode, &forceBusy, &live); err != nil || live != 1 {
+		c.send(map[string]any{"type": "error", "reason": "disabled"})
+		return
+	}
 	currentMode := mode.String
 	if currentMode == "" {
 		currentMode = "auto"
@@ -198,6 +219,10 @@ func hostSelfWebhook(c *Conn, msg map[string]any) {
 	if c.snapRole() != "host" {
 		return
 	}
+	if !selfOpenAllowed(c) {
+		c.send(map[string]any{"type": "error", "reason": "rate_limit"})
+		return
+	}
 	numberID := num(msg, "number_id")
 	if numberID <= 0 {
 		return
@@ -237,6 +262,10 @@ func hostSelfWebhook(c *Conn, msg map[string]any) {
 
 func hostSelfCall(c *Conn, msg map[string]any) {
 	if c.snapRole() != "host" {
+		return
+	}
+	if !selfOpenAllowed(c) {
+		c.send(map[string]any{"type": "error", "reason": "rate_limit"})
 		return
 	}
 	numberID := num(msg, "number_id")
@@ -321,8 +350,15 @@ func callStatus(c *Conn, msg map[string]any) {
 	}
 	callID := str(msg, "call_id")
 	status := str(msg, "status")
+	switch status {
+	case "dialing", "busy", "declined", "error", "scheduled", "awaiting_confirm", "ended":
+	default:
+		return
+	}
 	info := hub.call(callID)
-	if info == nil {
+	// Only the owner the call went to answers it: another owner who learnt the
+	// id (as a guest of this one) must not write its log or cancel it.
+	if info == nil || info.HostID != c.snapHostID() {
 		return
 	}
 	exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
@@ -464,7 +500,7 @@ func enqueueHostMsg(hostID int64, payload map[string]any) {
 		dedup = fmtDedup(payload)
 	}
 	b, err := jsonMarshal(payload)
-	if err != nil {
+	if err != nil || len(b) > 64<<10 {
 		return
 	}
 	exec(`INSERT IGNORE INTO pending_host_msgs (host_id, payload, dedup_key, created_at)
@@ -481,7 +517,15 @@ func enqueueHostMsg(hostID int64, payload map[string]any) {
 	}
 }
 
+// One flush per owner at a time: the greeting and the timer would otherwise
+// hand the same rows over twice.
+var flushing sync.Map
+
 func flushHostQueue(host *Conn, hostID int64) {
+	if _, busy := flushing.LoadOrStore(hostID, true); busy {
+		return
+	}
+	defer flushing.Delete(hostID)
 	rows, ok := query(`SELECT id, payload FROM pending_host_msgs WHERE host_id = ? ORDER BY id ASC`,
 		hostID)
 	if !ok {
@@ -499,10 +543,15 @@ func flushHostQueue(host *Conn, hostID int64) {
 		}
 	}
 	rows.Close()
+	sent := 0
 	for _, r := range list {
-		host.sendRaw([]byte(r.payload))
+		if !host.trySend([]byte(r.payload)) {
+			break // the rest waits for the next connection
+		}
 		exec(`DELETE FROM pending_host_msgs WHERE id = ?`, r.id)
+		sent++
 	}
+	list = list[:sent]
 	if len(list) > 0 {
 		log.Printf("queue: %d message(s) handed to host %d", len(list), hostID)
 	}

@@ -67,7 +67,7 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   </div>
 </div>
 
-<script src="/app/crypto.js?v=4"></script>
+<script src="/app/crypto.js?v=7"></script>
 <script <?= csp_nonce_attr() ?>>
 (function () {
   'use strict';
@@ -193,7 +193,13 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
     return;
   }
 
-  var parsed = EntrixyCrypto.parseInviteUri(location.href);
+  // The key lives in the anchor. Taken once, then the address is cleaned: the
+  // link must not stay in the browser history, where it would sync and linger.
+  var KEY_URL = location.href, KEY_HASH = location.hash.replace(/^#/, '');
+  var parsed = EntrixyCrypto.parseInviteUri(KEY_URL);
+  if (parsed && parsed.userKey) {
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  }
   if (!parsed || !parsed.userKey) {
     $('loading').hidden = true;
     $('err-text').textContent = t.no_key;
@@ -205,7 +211,7 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   // leaves the device, and beside it goes the server the key belongs to: the page
   // may be served by someone else's server, while the client is always ours.
   function webAppUrl() {
-    return 'https://entrixy.com/app/#' + location.hash.replace(/^#/, '')
+    return 'https://entrixy.com/app/#' + KEY_HASH
          + '&h=' + encodeURIComponent(location.host);
   }
 
@@ -229,7 +235,7 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   // picks the key up from the clipboard. We point at /download/android, which
   // explains Play Protect and the steps, rather than at the raw file.
   function downloadApk() {
-    var url = location.href;
+    var url = KEY_URL;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url);
       else {

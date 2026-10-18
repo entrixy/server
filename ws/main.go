@@ -107,13 +107,26 @@ func serveWS(w http.ResponseWriter, r *http.Request) {
 	c := &Conn{
 		id:       connID.Add(1),
 		ws:       ws,
-		out:      make(chan []byte, 64),
+		out:      make(chan []byte, 256),
 		closed:   make(chan struct{}),
 		lastPong: time.Now(),
 	}
 
 	ctx := context.Background()
 	go c.writeLoop(ctx)
+	// A connection has fifteen seconds to say who it is.
+	go func() {
+		t := time.NewTimer(15 * time.Second)
+		defer t.Stop()
+		select {
+		case <-t.C:
+			if c.snapRole() == "" {
+				c.setReason("no hello")
+				c.close()
+			}
+		case <-c.closed:
+		}
+	}()
 	readLoop(ctx, c)
 	onClose(c)
 }
@@ -152,6 +165,15 @@ func readLoop(ctx context.Context, c *Conn) {
 func onClose(c *Conn) {
 	role := c.snapRole()
 	hostID := c.snapHostID()
+	// Closed by one of the limits: worth a line, to tell abuse from a client
+	// the limits are too tight for.
+	c.mu.Lock()
+	why := c.reason
+	c.mu.Unlock()
+	switch why {
+	case "flood", "no hello", "message too large", "replaced by a new connection":
+		log.Printf("conn %d (%s, host %d) closed: %s", c.id, role, hostID, why)
+	}
 	switch role {
 	case "host":
 		// The phone may already be back on a new connection, and this is the

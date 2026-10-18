@@ -83,7 +83,9 @@ require __DIR__ . '/partials/head.php';
     <script <?= csp_nonce_attr() ?>>
       // Браузер принимает ключ сам; ключ к первому сообщению — из якоря.
       (function(){var h=location.hash.slice(1),a=document.getElementById('og-web');
-        if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;})();
+        if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;
+        // Taken into both buttons — out of the address, so it stays out of history.
+        if(h)try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </script>
     <?php if ($depth > 0): ?>
     <div class="og-note">You may pass this key on to others.</div>
