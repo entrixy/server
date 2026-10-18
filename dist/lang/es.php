@@ -221,4 +221,5 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'Load' => 'Cargar',
     'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — abra barreras, portones, cerraduras e interfonos',
     'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => 'Control de acceso desde el teléfono: abra barreras, portones, cerraduras e interfonos automáticamente.',
+    'Copied' => 'Copiado',
 ];

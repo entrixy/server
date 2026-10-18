@@ -3,6 +3,23 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-18
+
+**The server no longer keeps what it does not need.** A controller is
+registered without a name: `device_register.php` ignores `label`, the name
+lives with the owner in the encrypted object record. Issuing a manufacturer
+batch returns its keys once, in the reply (`keys`), and stores only the hash
+of each secret; the batch page downloads them as a file at that moment, and
+the old re-download is gone. App 10.39 also stops sending the barrier's
+number, the webhook address and secret and guest names; guests no longer
+receive the webhook address and secret at all. To clear what is already
+stored:
+
+```sql
+UPDATE devices SET device_secret = NULL;
+UPDATE devices SET label = '' WHERE vendor_id IS NULL;
+```
+
 ## 2026-10-13
 
 **Every guest of an object sees what the controller says about it.** Moving

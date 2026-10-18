@@ -221,4 +221,5 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — Schranken, Tore, Schlösser und Sprechanlagen öffnen',
     'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => 'Zutrittskontrolle per Telefon: Schranken, Tore, Schlösser und Sprechanlagen automatisch öffnen.',
     'in' => 'in',
+    'Copied' => 'Kopiert',
 ];

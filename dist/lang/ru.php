@@ -221,4 +221,5 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     '. Here' => '. Здесь',
     'in' => 'в',
     'Load' => 'Загрузить',
+    'Copied' => 'Скопировано',
 ];

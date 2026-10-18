@@ -223,4 +223,5 @@ fall to brute force in seconds. Nothing that decides access may travel this way.
     'Load' => '加载',
     'Entrixy — open barriers, gates, locks and intercoms' => 'Entrixy — 打开道闸、大门、门锁和对讲',
     'Access control from your phone: open barriers, gates, locks and intercoms automatically.' => '用手机进行门禁管理：自动打开道闸、大门、门锁和对讲。',
+    'Copied' => '已复制',
 ];
