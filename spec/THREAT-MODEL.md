@@ -16,7 +16,10 @@ openings is a log of a person's life.
 
 ## The server operator, including us
 
-**Defended.** The operator cannot open anything. The key that opens is never
+**Defended.** The operator cannot open anything — with one exception the owner
+chooses: a webhook the owner asked the server to fire. A call or a webhook fired
+by the owner's phone needs the guest's signature of the press, which the phone
+checks itself (see "Signing a press" in the guest protocol). The key that opens is never
 sent to the server — not when it is issued, not when it is used; the server
 keeps a fingerprint to find a record by and a public half to check a signature
 with. Names, phone numbers, geometry, welcome texts and automation rules arrive
@@ -32,9 +35,13 @@ fingerprint opened which object id, at what time, from which network. That is
 routing, and routing is the server's job. A controller that works over the
 internet holds its own connection to the server, so the server sees the
 controller's IP address and the time of each command sent to it. The content
-of the commands stays encrypted. They also see webhook addresses when
-the owner asked the server to fire them, and they can refuse service at any
-moment — a server that lies by omission is always possible.
+of the commands stays encrypted. They also see webhook addresses and secrets when
+the owner asked the server to fire them, and can fire such a webhook
+themselves. They can refuse service at any moment — a server that lies by
+omission is always possible. A key passed on down the chain is learnt by the
+owner's phone from the server the first time it appears: an operator lying at
+that very moment could slip in a key of their own. After that the phone keeps
+what it saw.
 
 One thing the operator must not be able to do is vouch for someone. That is why
 a company's key is fetched by the phone from the company's own domain, and why

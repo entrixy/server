@@ -118,6 +118,10 @@ type Call struct {
 	// caller decides, by the position it knows; for an encrypted controller it
 	// also signs that very action, so the server cannot swap it.
 	Action string
+	// The guest's signature of the press. The owner's phone carries out a call
+	// or a webhook only when it matches, so it is passed on untouched: the
+	// server cannot make one up.
+	Press map[string]any
 }
 
 // Everyone currently connected. One lock guards the lot: the traffic here is a

@@ -102,7 +102,7 @@ func hubLen[T any](m map[int64]T) int {
 // company calling in, or a guest whose websocket is down.
 func pumpPendingActions() {
 	rows, ok := query(`SELECT pa.id, pa.host_id, pa.number_id, pa.user_key_id, pa.source, pa.actor,
-	                          o.name AS org_name
+	                          o.name AS org_name, pa.press
 	                   FROM pending_actions pa
 	                   LEFT JOIN user_keys uk ON uk.id = pa.user_key_id
 	                   LEFT JOIN orgs o ON o.id = uk.org_id
@@ -113,12 +113,12 @@ func pumpPendingActions() {
 	}
 	type action struct {
 		id, hostID, numberID, userKeyID int64
-		source, actor, orgName          sql.NullString
+		source, actor, orgName, press   sql.NullString
 	}
 	var list []action
 	for rows.Next() {
 		var a action
-		if rows.Scan(&a.id, &a.hostID, &a.numberID, &a.userKeyID, &a.source, &a.actor, &a.orgName) == nil {
+		if rows.Scan(&a.id, &a.hostID, &a.numberID, &a.userKeyID, &a.source, &a.actor, &a.orgName, &a.press) == nil {
 			list = append(list, a)
 		}
 	}
@@ -141,9 +141,18 @@ func pumpPendingActions() {
 			label = a.orgName.String
 			org = 1
 		}
-		h.send(map[string]any{"type": "do_call", "call_id": callID,
+		out := map[string]any{"type": "do_call", "call_id": callID,
 			"number_id": a.numberID, "user_key_id": a.userKeyID,
-			"guest_label": label, "org": org, "actor": a.actor.String})
+			"guest_label": label, "org": org, "actor": a.actor.String}
+		// The guest's press signature, or the company's signed request: the
+		// owner's phone checks it before calling.
+		if a.press.Valid && a.press.String != "" {
+			var p map[string]any
+			if json.Unmarshal([]byte(a.press.String), &p) == nil {
+				out["press"] = p
+			}
+		}
+		h.send(out)
 	}
 	exec(`DELETE FROM pending_actions WHERE created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`)
 }

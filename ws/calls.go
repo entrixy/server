@@ -92,6 +92,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	}
 
 	callID := newCallID()
+	press, _ := msg["press"].(map[string]any)
 	hub.putCall(callID, &Call{
 		GuestOID:  c.id,
 		UserKeyID: userKeyID,
@@ -99,6 +100,7 @@ func guestCall(c *Conn, msg map[string]any) {
 		// Whose call this is: only the owner of this object may confirm it, not
 		// anyone who happens to hold an owner connection.
 		HostID: hostID,
+		Press:  press,
 	})
 	exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
 		userKeyID, numberID, "requested")
@@ -162,6 +164,9 @@ func guestCall(c *Conn, msg map[string]any) {
 		if a := str(msg, "action"); a == "toggle" || a == "close" || a == "open" {
 			dw["action"] = a
 		}
+		if press != nil {
+			dw["press"] = press
+		}
 		h.send(dw)
 		c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sent_to_host"})
 
@@ -175,13 +180,13 @@ func guestCall(c *Conn, msg map[string]any) {
 		}
 		if currentMode == "confirm" {
 			h.send(map[string]any{"type": "confirm_request", "call_id": callID,
-				"number_id": numberID, "user_key_id": userKeyID})
+				"number_id": numberID, "user_key_id": userKeyID, "press": press})
 			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "awaiting_confirm"})
 		} else {
 			h.send(map[string]any{"type": "do_call", "call_id": callID,
 				"number_id": numberID, "user_key_id": userKeyID,
 				"notify":          currentMode == "notify",
-				"force_when_busy": forceBusy.Int64 == 1})
+				"force_when_busy": forceBusy.Int64 == 1, "press": press})
 			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "requested"})
 		}
 	}
@@ -297,7 +302,8 @@ func confirmResponse(c *Conn, msg map[string]any) {
 	guest := hub.guest(info.GuestOID)
 	if accept {
 		c.send(map[string]any{"type": "do_call", "call_id": callID,
-			"number_id": info.NumberID, "user_key_id": info.UserKeyID, "notify": false})
+			"number_id": info.NumberID, "user_key_id": info.UserKeyID, "notify": false,
+			"press": info.Press})
 		if guest != nil {
 			guest.send(map[string]any{"type": "call_status", "call_id": callID, "status": "accepted"})
 		}

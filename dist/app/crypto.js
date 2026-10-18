@@ -217,6 +217,18 @@
     };
   }
 
+  /** The press signature for the owner's phone: a call or a webhook it carries
+   *  out only when this matches, so the server cannot press for the guest. Signed
+   *  with the key's own pair, the one the owner can derive without the server. */
+  async function pressFields(userKey, host, numberId, action) {
+    const ts = Math.floor(Date.now() / 1000);
+    const nonce = hexOf(crypto.getRandomValues(new Uint8Array(16)));
+    const material = `press-v1.${host}.${numberId}.${action}.${ts}.${nonce}`;
+    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, await signKey(userKey),
+      new TextEncoder().encode(material));
+    return { ts, nonce, action, sig: btoa(String.fromCharCode(...new Uint8Array(sig))) };
+  }
+
   /** Fields of the signed greeting: a live connection carries no headers. */
   async function helloFields(userKey, deviceFp) {
     const ts = String(Math.floor(Date.now() / 1000));
@@ -289,7 +301,7 @@
 
   global.EntrixyCrypto = {
     newUserKey, signPubB64, newSealPair, openKey,
-    signHeaders, helloFields, keyHash, agreeSuite, SUITE,
+    signHeaders, helloFields, pressFields, keyHash, agreeSuite, SUITE,
     encryptString, decryptString, decryptBytes,
     hmacSha256, b64Decode, b64Encode,
     b64uEncode, b64uDecode,

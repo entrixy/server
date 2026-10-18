@@ -5,6 +5,22 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-18
 
+**The server can no longer press for a guest.** A call or a webhook fired by the
+owner's phone is carried out only with the guest's signature of the press
+(`press-v1`, see the guest protocol); a company's opening carries its own signed
+request. The worker passes the signature on untouched; `host_sync` hands the
+owner the public half of keys passed on (`sign_pub`) and the company key
+(`org_pubkey`); `guest_call` and the company API keep the signature with the
+pending action. The database gains a column:
+
+```sql
+ALTER TABLE pending_actions ADD COLUMN press TEXT NULL;
+```
+
+Rebuild the service binary; app 10.42. Keys issued before cannot open by call
+until they are issued again.
+
+
 **The server no longer keeps what it does not need.** A controller is
 registered without a name: `device_register.php` ignores `label`, the name
 lives with the owner in the encrypted object record. Issuing a manufacturer

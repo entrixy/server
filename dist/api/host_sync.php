@@ -44,7 +44,7 @@ foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $n) {
 $st = db()->prepare(
     'SELECT uk.id, uk.enabled, uk.mode, uk.force_when_busy,
             uk.bundle_cipher, uk.bundle_cipher_updated,
-            uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher,
+            uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher, uk.sign_pub,
             uk.native_only, uk.ble_ids, uk.bundle_dirty,
             uk.org_id, o.name AS org_name, o.logo_hash,
             o.domain AS org_domain, o.pubkey AS org_pubkey,
@@ -72,7 +72,13 @@ foreach ($keys as &$k) {
     // A person compares the domain by eye with the company's site, so it goes out
     // as written rather than in punycode.
     elseif (function_exists('org_domain_display')) $k['org_domain'] = org_domain_display($k['org_domain']);
-    unset($k['org_pubkey']);
+    // The company's key: the owner's phone remembers it the first time it sees
+    // it and checks every request of that company against it.
+    $k['org_pubkey'] = $verified ? $k['org_pubkey'] : null;
+    // The public half of the key's own signing pair. The owner's phone derives it
+    // itself for keys it issued; for a key passed on it remembers this one.
+    $k['sign_pub'] = $k['sign_pub'] !== null && $k['sign_pub'] !== ''
+        ? rtrim(strtr(base64_encode($k['sign_pub']), '+/', '-_'), '=') : null;
     $k['parent_key_id']  = $k['parent_key_id'] !== null ? (int)$k['parent_key_id'] : null;
     $k['delegate_depth'] = (int)$k['delegate_depth'];
     // A key issued down a chain arrives without a bundle: only the owner can

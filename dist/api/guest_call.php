@@ -40,10 +40,13 @@ if ((int)$st->fetchColumn() >= $GLOBALS['rate_limit_per_min']) {
 }
 
 // The phone number is not on the server; the owner resolves it locally.
+// The guest's press signature goes to the owner's phone as it came: the phone
+// calls only when it matches, so the server cannot press for the guest.
+$press = is_array($j['press'] ?? null) ? json_encode($j['press'], JSON_UNESCAPED_SLASHES) : null;
 db()->prepare(
-    'INSERT INTO pending_actions (host_id, number_id, user_key_id, source, created_at)
-     VALUES (?, ?, ?, ?, NOW())'
-)->execute([$row['host_id'], $number_id, $row['user_key_id'], 'guest_geo']);
+    'INSERT INTO pending_actions (host_id, number_id, user_key_id, source, press, created_at)
+     VALUES (?, ?, ?, ?, ?, NOW())'
+)->execute([$row['host_id'], $number_id, $row['user_key_id'], 'guest_geo', $press]);
 
 db()->prepare(
     'INSERT INTO call_log (user_key_id, number_id, ts, status)

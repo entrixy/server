@@ -248,6 +248,7 @@ CREATE TABLE `pending_actions` (
   `source` varchar(32) NOT NULL,
   `actor` varchar(64) DEFAULT NULL,
   `created_at` datetime NOT NULL,
+  `press` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;

@@ -294,10 +294,15 @@ if ($action === 'open') {
 
     // The employee's name travels to the owner with the task: the log must show not
     // only which company opened the gate but who pressed the button.
+    // The company's signed request travels to the owner's phone as it came: the
+    // phone checks it with the company key it remembered when granting access,
+    // so the server cannot open on the company's behalf.
+    $m = $GLOBALS['org_sig_material'] ?? null;
+    $press = $m ? json_encode(['org' => $m], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
     db()->prepare(
-        'INSERT INTO pending_actions (host_id, number_id, user_key_id, source, actor, created_at)
-         VALUES (?, ?, ?, ?, ?, NOW())'
-    )->execute([$k['host_id'], $number_id, $key_ref, 'org_api', $actor]);
+        'INSERT INTO pending_actions (host_id, number_id, user_key_id, source, actor, press, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())'
+    )->execute([$k['host_id'], $number_id, $key_ref, 'org_api', $actor, $press]);
     db()->prepare(
         'INSERT INTO call_log (user_key_id, number_id, ts, status, actor) VALUES (?, ?, NOW(), ?, ?)'
     )->execute([$key_ref, $number_id, 'requested_org', $actor]);

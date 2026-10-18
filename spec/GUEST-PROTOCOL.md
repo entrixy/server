@@ -127,6 +127,37 @@ a chain works the same way — the recipient generates their own key and sends
 All of them are signed as described above. `key_delegate?a=info` and
 `a=redeem` are open: the caller does not hold a key yet.
 
+## Signing a press for the owner's phone
+
+A call or a webhook "from the phone" is carried out by the owner's phone, not
+by a controller. The server tells the phone "guest N pressed object M", and the
+phone acts only when the guest's own signature of that press comes with it:
+
+    press-v1.<server host>.<object id on the server>.<action>.<ts>.<nonce>
+
+signed with the key's base pair (the one derived from the key string with
+`entrixy-guest-sign-v1`, not the device pair). `action` is the action the
+guest asked for (`open`, `close`, `toggle`) or empty for a call. The guest
+sends `press: {ts, nonce, action, sig}` with the `call` message or with
+`guest_call`; the server passes it on untouched in `do_call`,
+`confirm_request` and `do_webhook`.
+
+The owner's phone knows the public half without the server: for a key it
+issued it derives it from the key string it keeps; for a key passed on down the
+chain it remembers `sign_pub` from `host_sync` the first time it sees the key
+and never replaces it. The phone accepts a signature at most ten minutes old and
+each nonce once. A press that fails is not carried out and goes into the
+owner's log as rejected.
+
+A company's opening arrives with the company's own signed request
+(`press: {org: {domain, ts, nonce, body, sig}}`, the material and key of the
+company API). The phone checks it with the company key it remembered when the
+company was given access, and checks that the request names this key and this
+object.
+
+A webhook "from the server" is the exception by definition: the server holds
+its address and secret and sends the request itself.
+
 ## Contents of the bundle
 
 The bundle is encrypted with K_guest, the second half of the link:
