@@ -3,6 +3,16 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-10-19
+
+**A company opens only with its signed request.** The company API refuses an
+opening without the domain signature (`sign_required`), and the cabinet no
+longer offers a test opening: the client's phone has nothing to check in either
+and would decline. The end of a movement reported by the limit switch is
+credited to the guest who pressed only when it confirms or fails that press; a
+button, auto-close or a door moved by hand clears it. Log uploads are capped on
+disk. No database changes; rebuild the service binary; app 10.47.
+
 ## 2026-10-18
 
 **A key passed on is vouched for by whoever passed it.** The recipient proves

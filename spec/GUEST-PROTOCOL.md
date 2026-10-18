@@ -144,16 +144,22 @@ sends `press: {ts, nonce, action, sig}` with the `call` message or with
 
 The owner's phone knows the public half without the server: for a key it
 issued it derives it from the key string it keeps; for a key passed on down the
-chain it remembers `sign_pub` from `host_sync` the first time it sees the key
-and never replaces it. The phone accepts a signature at most ten minutes old and
+chain it takes `sign_pub` from `host_sync` only under the vouch of whoever
+passed it on (below); a link opened again brings a new vouched key, which
+replaces the old one. The phone accepts a signature at most ten minutes old and
 each nonce once. A press that fails is not carried out and goes into the
 owner's log as rejected.
 
 A company's opening arrives with the company's own signed request
 (`press: {org: {domain, ts, nonce, body, sig}}`, the material and key of the
 company API). The phone checks it with the company key it remembered when the
-company was given access, and checks that the request names this key and this
-object.
+company was given access, and checks that the request is an opening of this
+key and this object: `key_ref` is the key, `actor` is present (a signed
+`objects` lookup has none, so it cannot pass for an opening), and `number_id`
+is this object or is left out for a key with a single object. A call that
+waits for the owner's "Allow" counts its checked signature once, for the same
+key, object and action. Openings from the company cabinet carry no signature
+and are refused by the server.
 
 A webhook "from the server" is the exception by definition: the server holds
 its address and secret and sends the request itself.

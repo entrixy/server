@@ -294,6 +294,9 @@ if ($action === 'open') {
 
     // The employee's name travels to the owner with the task: the log must show not
     // only which company opened the gate but who pressed the button.
+    // Without the domain signature the client's phone has nothing to check and
+    // declines the opening: refuse here, with a reason the company can act on.
+    if (empty($GLOBALS['org_sig_material'])) jout(['error' => 'sign_required'], 401);
     // The company's signed request travels to the owner's phone as it came: the
     // phone checks it with the company key it remembered when granting access,
     // so the server cannot open on the company's behalf.

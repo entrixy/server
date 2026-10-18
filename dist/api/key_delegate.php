@@ -380,10 +380,11 @@ if ($action === 'redeem') {
              VALUES (?,?,?,?,?,?,?,1,"auto",?,?,NOW())'
         )->execute([(int)$inv['host_id'], (int)$inv['parent_key_id'], $grp, $guest_pub, $key_hash,
                     $sign_pub, $suite, $pk['expires_at'], $mac]);
+        // The new key's id first: any insert after it would take over lastInsertId().
+        $childId = (int)db()->lastInsertId();
         // Whoever passed it on is asked to vouch for the new keys.
         db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('pass_vouch', ?, NOW())")
             ->execute([(int)$inv['parent_key_id']]);
-        $childId = (int)db()->lastInsertId();
         key_obj_write($childId, $sets);
         db()->prepare('UPDATE key_invites SET status="redeemed", child_key_id=?, redeemed_at=NOW() WHERE id=?')
             ->execute([$childId, (int)$inv['id']]);

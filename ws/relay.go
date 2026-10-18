@@ -277,12 +277,23 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 			delete(hub.lastPress, devID) // the owner pressed since
 		}
 		hub.stateMu.Unlock()
+	} else if event == "button" || event == "auto" ||
+		(event == "limit" && !boolOf(msg, "confirm", false) && !boolOf(msg, "hold", false)) {
+		// The board moved on its own since — a button, auto-close, the door
+		// moved by hand: the next end of a movement is not that guest's.
+		hub.stateMu.Lock()
+		delete(hub.lastPress, devID)
+		hub.stateMu.Unlock()
 	} else if event == "limit" && message != "" {
+		// Only the limit switch confirming a movement or reporting it failed
+		// ends a press.
 		// The end of a movement a guest's press started: confirmed or failed.
 		// The travel time is capped at two minutes; a failure may come up to
 		// twice that after the press.
+		// One movement has one end: the press is spent on it.
 		hub.stateMu.Lock()
 		lp, ok := hub.lastPress[devID]
+		delete(hub.lastPress, devID)
 		hub.stateMu.Unlock()
 		if ok && time.Since(lp.at) < 5*time.Minute {
 			presser = lp.guestOID
