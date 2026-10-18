@@ -67,14 +67,16 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   </div>
 </div>
 
-<script src="/app/crypto.js?v=7"></script>
+<script src="/app/crypto.js?v=8"></script>
 <script <?= csp_nonce_attr() ?>>
 (function () {
   'use strict';
   var browserLang = (navigator.language || '').slice(0, 2);
   var urlLang = new URLSearchParams(location.search).get('lang');
-  if (urlLang) localStorage.setItem('gon_lang', urlLang);
-  var uiLang = localStorage.getItem('gon_lang') || (['ru','de','es','fr','pt','zh'].indexOf(browserLang) >= 0 ? browserLang : 'en');
+  var KNOWN = ['en','ru','de','es','fr','pt','zh'];
+  if (urlLang && KNOWN.indexOf(urlLang) >= 0) localStorage.setItem('gon_lang', urlLang);
+  var uiLang = localStorage.getItem('gon_lang') || '';
+  if (KNOWN.indexOf(uiLang) < 0) uiLang = (['ru','de','es','fr','pt','zh'].indexOf(browserLang) >= 0 ? browserLang : 'en');
   var S = {
     ru: {
       eyebrow: 'Вам передали доступ',
@@ -219,8 +221,9 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
     var keys = JSON.parse(localStorage.getItem('gon_keys') || '[]');
     var kb64 = parsed.kGuest ? EntrixyCrypto.b64uEncode(parsed.kGuest) : '';
     var ex = keys.find(function (x) { return x.user_key === parsed.userKey; });
-    if (ex) { if (kb64) ex.k_guest_b64 = kb64; }
-    else keys.push({ user_key: parsed.userKey, k_guest_b64: kb64 });
+    // The server goes with the key: this page is served by the key's own server.
+    if (ex) { if (kb64) ex.k_guest_b64 = kb64; if (!ex.host) ex.host = location.host; }
+    else keys.push({ user_key: parsed.userKey, k_guest_b64: kb64, host: location.host });
     localStorage.setItem('gon_keys', JSON.stringify(keys));
   }
 

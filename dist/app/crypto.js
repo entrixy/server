@@ -108,7 +108,17 @@
    *  2. "entrixy:k?t=USERKEY&k=K_GUEST_B64URL" — an older deep link.
    *  3. "https://entrixy.com/go/<USERKEY>" or "...?t=..#k=.." — older still.
    *  4. a bare blob of 75 characters, or a bare user key of 32. */
+  // Ключ — ровно 32 символа base64url. Всё прочее — не ключ: строка попадает
+  // в разметку и в хранилище, кавычке или скобке в ней взяться неоткуда.
+  const KEY_RE = /^[A-Za-z0-9_-]{32}$/;
   function parseInviteUri(input) {
+    let r;
+    try { r = parseInviteUriRaw(input); } catch (_) { return null; }
+    if (!r || !KEY_RE.test(r.userKey || '')) return null;
+    if (r.kGuest && r.kGuest.length !== 32) r.kGuest = null;
+    return r;
+  }
+  function parseInviteUriRaw(input) {
     if (!input) return null;
     const s = input.trim();
     // Format 2: entrixy:k?t=...&k=...

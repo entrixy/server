@@ -332,7 +332,13 @@ func guestHello(c *Conn, msg map[string]any) {
 		Scan(&ukID, &hostID, &mode, &boundFP, &nativeOnly, &orgID, &expiresAt,
 			&signPub, &signSuite, &signPubDevice)
 	if err != nil {
-		c.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
+		// "bad_key" the browser takes as "revoked" and forgets the key: say it
+		// only when there is no such key, not when the database hiccupped.
+		reason := "server_error"
+		if err == sql.ErrNoRows {
+			reason = "bad_key"
+		}
+		c.sendThenClose(map[string]any{"type": "error", "reason": reason})
 		return
 	}
 	// The key exists but carries no public half: it was issued before keys
@@ -379,7 +385,8 @@ func guestHello(c *Conn, msg map[string]any) {
 	// One-time number: an overheard greeting does not pass twice.
 	if _, err := db.Exec(`INSERT INTO guest_nonces (key_hash, nonce, used_at) VALUES (?,?,NOW())`,
 		hash, nonce); err != nil {
-		c.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
+		// A greeting seen before, or the table failed: either way the key is fine.
+		c.sendThenClose(map[string]any{"type": "error", "reason": "replay"})
 		return
 	}
 

@@ -5,6 +5,10 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**A greeting refused for the right reason.** The worker tells a missing key
+(`bad_key`) from a database error (`server_error`) and a repeated greeting
+(`replay`), so a client does not forget a key over a hiccup. App 10.52.
+
 **The worker holds each connection to its place.** A guest's key is checked on
 every press (enabled, not expired), not only at hello. Each connection is paced
 (ten messages a second for guests and controllers, fifty for owners; a guest's
