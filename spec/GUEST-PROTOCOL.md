@@ -158,6 +158,24 @@ object.
 A webhook "from the server" is the exception by definition: the server holds
 its address and secret and sends the request itself.
 
+## Vouching for a key passed on
+
+The recipient's public keys reach the owner through the server, so they are
+accepted only when the holder who passed the key on vouches for them:
+
+1. The link carries a secret after `#` (`wk`); the server never sees it.
+2. At `redeem` the recipient sends, per part,
+   `mac = hex(HMAC-SHA256(wk, "entrixy-pass-v1|<grp>|<sign_pub>|<guest_pub>"))`.
+3. The holder's phone lists its children, recomputes the MAC and, when it
+   matches, signs `entrixy-vouch-v1|<server host>|<child key id>|<sign_pub>|<guest_pub>`
+   with its base pair and sends it with `key_delegate?a=vouch`.
+4. The owner's phone checks that signature with the holder's public half — derived
+   from the key string for a key it issued, or remembered after an earlier vouch —
+   and only then seals the bundle for `guest_pub` and remembers `sign_pub`.
+
+A Bluetooth pass renewed by the owner on a guest's request travels sealed with
+the guest's bundle key: `ble_token_response` carries `cipher` only.
+
 ## Contents of the bundle
 
 The bundle is encrypted with K_guest, the second half of the link:

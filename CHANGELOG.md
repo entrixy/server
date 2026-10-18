@@ -5,6 +5,21 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-18
 
+**A key passed on is vouched for by whoever passed it.** The recipient proves
+their public keys with the secret in the link's fragment (`mac` in `redeem`,
+`entrixy-pass-v1`); the holder who passed the key on checks the proof and signs
+the recipient's keys with their own (`key_delegate?a=vouch`, `entrixy-vouch-v1`);
+the owner's phone assembles the bundle only under that signature, checked with a
+key it knows without the server. A Bluetooth pass renewed through the server now
+travels sealed with the guest's bundle key (`cipher`). Database:
+
+```sql
+ALTER TABLE user_keys ADD COLUMN pass_mac VARCHAR(64) NULL, ADD COLUMN vouch_sig VARCHAR(128) NULL;
+```
+
+Rebuild the service binary; app 10.43.
+
+
 **The server can no longer press for a guest.** A call or a webhook fired by the
 owner's phone is carried out only with the guest's signature of the press
 (`press-v1`, see the guest protocol); a company's opening carries its own signed

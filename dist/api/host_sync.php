@@ -44,7 +44,7 @@ foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $n) {
 $st = db()->prepare(
     'SELECT uk.id, uk.enabled, uk.mode, uk.force_when_busy,
             uk.bundle_cipher, uk.bundle_cipher_updated,
-            uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher, uk.sign_pub,
+            uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher, uk.sign_pub, uk.vouch_sig,
             uk.native_only, uk.ble_ids, uk.bundle_dirty,
             uk.org_id, o.name AS org_name, o.logo_hash,
             o.domain AS org_domain, o.pubkey AS org_pubkey,

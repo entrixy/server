@@ -500,7 +500,9 @@ func bleTokenResponse(c *Conn, msg map[string]any) {
 		return
 	}
 	payload := map[string]any{"type": "ble_token_response", "ble_id": bleID}
-	for _, k := range []string{"token", "sig", "gkey", "valid_until", "did", "label", "rssi", "error"} {
+	// The pass itself travels sealed with the guest's bundle key ("cipher"): the
+	// server relays it and can neither read it nor use it.
+	for _, k := range []string{"cipher", "error"} {
 		if v, ok := msg[k]; ok {
 			payload[k] = v
 		}

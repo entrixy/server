@@ -332,6 +332,8 @@ CREATE TABLE `user_keys` (
   `sign_pub` varbinary(32) DEFAULT NULL COMMENT 'Ed25519 pub derived from the key string: guest signatures are checked with it',
   `sign_suite` varchar(8) NOT NULL DEFAULT 'v1' COMMENT 'the crypto suite this key was issued under',
   `sign_pub_device` varbinary(32) DEFAULT NULL COMMENT 'Ed25519 pub generated on the bound device: once set, the link-derived pair is refused',
+  `pass_mac` varchar(64) DEFAULT NULL,
+  `vouch_sig` varchar(128) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `key_hash` (`key_hash`),
   KEY `host_id` (`host_id`),

@@ -38,10 +38,10 @@ controller's IP address and the time of each command sent to it. The content
 of the commands stays encrypted. They also see webhook addresses and secrets when
 the owner asked the server to fire them, and can fire such a webhook
 themselves. They can refuse service at any moment — a server that lies by
-omission is always possible. A key passed on down the chain is learnt by the
-owner's phone from the server the first time it appears: an operator lying at
-that very moment could slip in a key of their own. After that the phone keeps
-what it saw.
+omission is always possible. A key passed on down the chain reaches the owner's
+phone through the server, but the phone trusts it only when whoever passed it on
+vouches for it with a signature the server cannot make (see "Vouching" in the
+guest protocol).
 
 One thing the operator must not be able to do is vouch for someone. That is why
 a company's key is fetched by the phone from the company's own domain, and why

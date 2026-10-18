@@ -220,6 +220,12 @@ func pumpNotifications() {
 			}
 		case "pass_open":
 			notifyPassOpen(n.keyID)
+		case "pass_vouch":
+			// Someone accepted a key this holder passed on: their phone checks the
+			// recipient's proof and vouches for the new keys to the owner.
+			for _, g := range hub.guestsOfKey(n.keyID) {
+				g.send(map[string]any{"type": "pass_vouch"})
+			}
 		case "message_new":
 			for _, g := range hub.guestsOfKey(n.keyID) {
 				deliverMessages(g, n.keyID)

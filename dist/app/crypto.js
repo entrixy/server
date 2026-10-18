@@ -229,6 +229,15 @@
     return { ts, nonce, action, sig: btoa(String.fromCharCode(...new Uint8Array(sig))) };
   }
 
+  /** The recipient's proof of their public keys, made with the secret from the
+   *  link's fragment that the server never sees: whoever passed the key on
+   *  checks it and vouches for these keys to the owner. */
+  async function passMac(wkB64, grp, signPub, guestPub) {
+    const k = await crypto.subtle.importKey('raw', b64uDecode(wkB64), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    const mac = await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`entrixy-pass-v1|${grp}|${signPub}|${guestPub}`));
+    return hexOf(mac);
+  }
+
   /** Fields of the signed greeting: a live connection carries no headers. */
   async function helloFields(userKey, deviceFp) {
     const ts = String(Math.floor(Date.now() / 1000));
@@ -301,7 +310,7 @@
 
   global.EntrixyCrypto = {
     newUserKey, signPubB64, newSealPair, openKey,
-    signHeaders, helloFields, pressFields, keyHash, agreeSuite, SUITE,
+    signHeaders, helloFields, pressFields, passMac, keyHash, agreeSuite, SUITE,
     encryptString, decryptString, decryptBytes,
     hmacSha256, b64Decode, b64Encode,
     b64uEncode, b64uDecode,

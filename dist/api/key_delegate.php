@@ -318,6 +318,11 @@ if ($action === 'redeem') {
         if (!preg_match('/^[a-f0-9]{64}$/', $key_hash) || $sign_pub === false || strlen($sign_pub) !== 32) {
             $out[] = ['code' => $code, 'error' => 'bad_input']; continue;
         }
+        // The recipient's proof, made with the secret in the link's fragment that
+        // the server never sees: whoever passed the key on checks it and vouches
+        // for these public keys to the owner. The server can only carry it.
+        $mac = strtolower(trim((string)($p['mac'] ?? '')));
+        if (!preg_match('/^[a-f0-9]{64}$/', $mac)) $mac = null;
         $st->execute([$code, $grp]);
         $inv = $st->fetch(PDO::FETCH_ASSOC);
         if (!$inv) { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
@@ -338,8 +343,11 @@ if ($action === 'redeem') {
             }
             db()->prepare(
                 'UPDATE user_keys SET key_hash = ?, sign_pub = ?, sign_suite = ?, sign_pub_device = NULL,
-                                      guest_pub = ?, key_cipher = NULL, bundle_dirty = 1 WHERE id = ?'
-            )->execute([$key_hash, $sign_pub, $suite, $guest_pub, (int)$child['id']]);
+                                      guest_pub = ?, key_cipher = NULL, bundle_dirty = 1,
+                                      pass_mac = ?, vouch_sig = NULL WHERE id = ?'
+            )->execute([$key_hash, $sign_pub, $suite, $guest_pub, $mac, (int)$child['id']]);
+            db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('pass_vouch', ?, NOW())")
+                ->execute([(int)$child['parent_key_id']]);
             [$cn, $cb] = split_types(array_keys(key_obj_read((int)$child['id'])));
             ask_owner((int)$child['host_id'], (int)$child['id'], (int)$child['parent_key_id'], $cn, $cb);
             $out[] = ['code' => $code, 'id' => (int)$child['id'], 'key_hash' => $key_hash, 'again' => 1];
@@ -368,10 +376,13 @@ if ($action === 'redeem') {
         // assembles one it opens nothing. Lifetime is inherited from the parent.
         db()->prepare(
             'INSERT INTO user_keys (host_id, parent_key_id, share_grp, guest_pub, key_hash,
-                                    sign_pub, sign_suite, enabled, mode, expires_at, created_at)
-             VALUES (?,?,?,?,?,?,?,1,"auto",?,NOW())'
+                                    sign_pub, sign_suite, enabled, mode, expires_at, pass_mac, created_at)
+             VALUES (?,?,?,?,?,?,?,1,"auto",?,?,NOW())'
         )->execute([(int)$inv['host_id'], (int)$inv['parent_key_id'], $grp, $guest_pub, $key_hash,
-                    $sign_pub, $suite, $pk['expires_at']]);
+                    $sign_pub, $suite, $pk['expires_at'], $mac]);
+        // Whoever passed it on is asked to vouch for the new keys.
+        db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('pass_vouch', ?, NOW())")
+            ->execute([(int)$inv['parent_key_id']]);
         $childId = (int)db()->lastInsertId();
         key_obj_write($childId, $sets);
         db()->prepare('UPDATE key_invites SET status="redeemed", child_key_id=?, redeemed_at=NOW() WHERE id=?')
@@ -388,6 +399,24 @@ if ($action === 'redeem') {
         jout(['error' => $err, 'parts' => $out], $err === 'expired' ? 410 : 404);
     }
     jout(['ok' => 1, 'parts' => $out, 'state' => 'awaiting_owner']);
+}
+
+// ── Vouch for a key passed on ───────────────────────────────────────────────────
+// The holder who passed the key checked the recipient's proof with the link's
+// secret and signs the recipient's public keys with their own key. The owner's
+// phone checks that signature; the server only stores it.
+if ($action === 'vouch') {
+    $k = guest_key_auth($j);
+    $child = (int)($j['child_id'] ?? 0);
+    $sig = (string)($j['sig'] ?? '');
+    if ($child <= 0 || !preg_match('#^[A-Za-z0-9+/=]{80,100}$#', $sig)) jout(['error' => 'bad_input'], 400);
+    $u = db()->prepare('UPDATE user_keys SET vouch_sig = ? WHERE id = ? AND parent_key_id = ?');
+    $u->execute([$sig, $child, (int)$k['id']]);
+    if ($u->rowCount() > 0) {
+        db()->prepare("INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES ('key_delegated', ?, NOW())")
+            ->execute([$child]);
+    }
+    jout(['ok' => 1]);
 }
 
 // ── Withdraw a part nobody has accepted ─────────────────────────────────────────
@@ -419,7 +448,8 @@ if ($action === 'list') {
     }
     unset($i);
     $ch = db()->prepare(
-        'SELECT id, share_grp, guest_pub, confirmed_ids, bundle_dirty,
+        'SELECT id, share_grp, guest_pub, confirmed_ids, bundle_dirty, sign_pub, pass_mac,
+                (vouch_sig IS NOT NULL) AS vouched,
                 (bundle_cipher IS NOT NULL) AS has_bundle, created_at
          FROM user_keys WHERE parent_key_id = ? ORDER BY id DESC'
     );
@@ -430,6 +460,9 @@ if ($action === 'list') {
         [$cn, $cb] = split_types(array_keys($objs));
         $children[] = [
             'id' => (int)$c['id'], 'grp' => $c['share_grp'], 'guest_pub' => $c['guest_pub'],
+            // For vouching: the recipient's public keys and their proof.
+            'sign_pub' => $c['sign_pub'] !== null ? rtrim(strtr(base64_encode($c['sign_pub']), '+/', '-_'), '=') : null,
+            'pass_mac' => $c['pass_mac'], 'vouched' => (int)$c['vouched'],
             'number_ids' => $cn, 'ble_ids' => $cb,
             'objects' => array_map(fn($id) => ['id' => $id, 'depth' => $objs[$id]['d'], 'pool' => $objs[$id]['p']],
                                    array_keys($objs)),
