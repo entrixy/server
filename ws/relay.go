@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"unicode/utf8"
 )
 
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
@@ -207,7 +208,8 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 		return
 	}
 	commandID := str(msg, "command_id")
-	message := str(msg, "message")
+	// The controller's words go to the card as they are, but not a page of them.
+	message := clipRunes(str(msg, "message"), 200)
 
 	var level string
 	var final bool
@@ -433,6 +435,16 @@ func deviceStatus(c *Conn, msg map[string]any, typ string) {
 	}
 }
 
+// At most n characters, cut on a character boundary: a byte cut through a
+// Cyrillic letter would reach the card as a broken symbol.
+func clipRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	return string(r[:n])
+}
+
 func webhookResult(c *Conn, msg map[string]any) {
 	if c.snapRole() != "host" {
 		return
@@ -453,9 +465,7 @@ func webhookResult(c *Conn, msg map[string]any) {
 	if info == nil || info.HostID != c.snapHostID() {
 		return
 	}
-	if len(message) > 200 {
-		message = message[:200]
-	}
+	message = clipRunes(message, 200)
 	if g := hub.guest(info.GuestOID); g != nil {
 		// The guest's card is found by the object: without it the result of a
 		// webhook sent from the owner's phone never reached the guest.

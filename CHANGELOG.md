@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Calls and statuses.** An owner's "allow" counts for three minutes after the
+press; a later one is a refusal, the guest is told so and the owner gets
+`confirm_expired`. A call status relayed from the owner carries `number_id`, so
+it lands on the card of the object pressed. A controller's status text is cut
+to 200 characters, and a webhook's on a character boundary.
+
 **Included code is not served.** `lib/`, `partials/` and `lang/` answer 404 in the
 web container and are denied in the native nginx example: these files are only
 ever included, and run on their own they do nothing useful.

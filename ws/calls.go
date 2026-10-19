@@ -325,6 +325,9 @@ func hostSelfCall(c *Conn, msg map[string]any) {
 	c.send(map[string]any{"type": "device_sent", "call_id": callID, "number_id": numberID})
 }
 
+// How long an owner's "allow" still counts after the guest pressed.
+const confirmMaxAge = 3 * time.Minute
+
 func confirmResponse(c *Conn, msg map[string]any) {
 	if c.snapRole() != "host" {
 		return
@@ -340,10 +343,23 @@ func confirmResponse(c *Conn, msg map[string]any) {
 	if info.HostID != c.snapHostID() {
 		return
 	}
+	guest := hub.guest(info.GuestOID)
+	// An answer long after the press opens for nobody: the guest has gone. A
+	// late "allow" is a refusal, and the guest is told so.
+	hub.mu.Lock()
+	age := time.Since(info.at)
+	hub.mu.Unlock()
+	if accept && age > confirmMaxAge {
+		if hub.takeConfirm(callID) && guest != nil {
+			guest.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": info.NumberID, "status": "declined"})
+		}
+		c.send(map[string]any{"type": "confirm_expired", "call_id": callID})
+		hub.dropCall(callID)
+		return
+	}
 	if !hub.takeConfirm(callID) {
 		return
 	}
-	guest := hub.guest(info.GuestOID)
 	if accept {
 		c.send(map[string]any{"type": "do_call", "call_id": callID,
 			"number_id": info.NumberID, "user_key_id": info.UserKeyID, "notify": false,
@@ -379,7 +395,9 @@ func callStatus(c *Conn, msg map[string]any) {
 	exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
 		info.UserKeyID, info.NumberID, status)
 	if g := hub.guest(info.GuestOID); g != nil {
-		g.send(map[string]any{"type": "call_status", "call_id": callID, "status": status})
+		// With the object, as every other status: the guest may have pressed
+		// another card since, and the answer belongs on this one.
+		g.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": info.NumberID, "status": status})
 	}
 	if status == "ended" || status == "error" || status == "declined" {
 		hub.dropCall(callID)
