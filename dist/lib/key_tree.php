@@ -47,11 +47,24 @@ function key_revoke_tree(int $id): array {
     $dn   = db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?');
     $dk   = db()->prepare('DELETE FROM user_keys WHERE id = ?');
     $di   = db()->prepare('UPDATE key_invites SET status = "cancelled" WHERE parent_key_id = ? AND status = "new"');
-    foreach ($tree as $kid) {
-        $note->execute(['key_revoked', $kid]);
-        $di->execute([$kid]);
-        $dn->execute([$kid]);
-        $dk->execute([$kid]);
+    // Уже поставленные в очередь открытия этих ключей тоже уходят.
+    $dp   = db()->prepare('DELETE FROM pending_actions WHERE user_key_id = ?');
+    // Дерево отзывается целиком или никак: полуотозванное держало бы часть
+    // ключей живыми.
+    $own = !db()->inTransaction();
+    if ($own) db()->beginTransaction();
+    try {
+        foreach ($tree as $kid) {
+            $note->execute(['key_revoked', $kid]);
+            $di->execute([$kid]);
+            $dp->execute([$kid]);
+            $dn->execute([$kid]);
+            $dk->execute([$kid]);
+        }
+        if ($own) db()->commit();
+    } catch (\Throwable $e) {
+        if ($own) db()->rollBack();
+        throw $e;
     }
     foreach ($orgKeys as $ok) {
         $codes = db()->prepare('SELECT code FROM org_requests WHERE user_key_id = ?');

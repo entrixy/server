@@ -25,6 +25,7 @@ func startTimers(ctx context.Context) {
 	go every(ctx, time.Hour, expireMessages)
 	go every(ctx, time.Hour, expireNonces)
 	go every(ctx, time.Minute, expireCalls)
+	go every(ctx, time.Hour, retentionSweep)
 	go every(ctx, 10*time.Second, pingPhones)
 	go every(ctx, time.Second, reapDevices)
 }
@@ -105,7 +106,9 @@ func pumpPendingActions() {
 	rows, ok := query(`SELECT pa.id, pa.host_id, pa.number_id, pa.user_key_id, pa.source, pa.actor,
 	                          o.name AS org_name, pa.press
 	                   FROM pending_actions pa
-	                   LEFT JOIN user_keys uk ON uk.id = pa.user_key_id
+	                   JOIN user_keys uk ON uk.id = pa.user_key_id
+	                     AND uk.enabled = 1 AND COALESCE(uk.mode, 'auto') <> 'off'
+	                     AND (uk.expires_at IS NULL OR uk.expires_at > NOW())
 	                   LEFT JOIN orgs o ON o.id = uk.org_id
 	                   WHERE pa.created_at > DATE_SUB(NOW(), INTERVAL 30 SECOND)
 	                   ORDER BY pa.id ASC LIMIT 50`)
@@ -125,10 +128,23 @@ func pumpPendingActions() {
 	}
 	rows.Close()
 
+	// What nobody took in 30 seconds — or a key revoked meanwhile — goes.
+	exec(`DELETE FROM pending_actions WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)`)
+
 	for _, a := range list {
-		exec(`DELETE FROM pending_actions WHERE id = ?`, a.id)
+		// The owner's phone may be reconnecting this very second: the row waits
+		// (the 30-second window above) instead of being dropped unsent.
 		h := hub.host(a.hostID)
 		if h == nil {
+			continue
+		}
+		// Claimed by deleting it: only the one who deleted the row sends it, so a
+		// second worker (a restart overlap) cannot open twice.
+		res, err := db.Exec(`DELETE FROM pending_actions WHERE id = ?`, a.id)
+		if err != nil {
+			continue
+		}
+		if n, _ := res.RowsAffected(); n != 1 {
 			continue
 		}
 		callID := newCallID()
@@ -364,7 +380,19 @@ func first(s string, n int) string {
 // after an object was deleted or taken out of a key) used to wait for the
 // owner's next connect. An owner online gets them within two seconds.
 func pumpHostQueue() {
-	rows, ok := query(`SELECT DISTINCT host_id FROM pending_host_msgs LIMIT 100`)
+	// Owners connected here, not the first hundred with a queue: a hundred
+	// owners away for a week would otherwise hold the slots and a connected
+	// one would never be served by the timer.
+	hub.mu.RLock()
+	conns := make(map[int64]*Conn, len(hub.hosts))
+	for id, c := range hub.hosts {
+		conns[id] = c
+	}
+	hub.mu.RUnlock()
+	if len(conns) == 0 {
+		return
+	}
+	rows, ok := query(`SELECT DISTINCT host_id FROM pending_host_msgs`)
 	if !ok {
 		return
 	}
@@ -372,13 +400,36 @@ func pumpHostQueue() {
 	for rows.Next() {
 		var id int64
 		if rows.Scan(&id) == nil {
-			ids = append(ids, id)
+			if _, on := conns[id]; on {
+				ids = append(ids, id)
+			}
 		}
 	}
 	rows.Close()
 	for _, id := range ids {
-		if h := hub.host(id); h != nil {
-			flushHostQueue(h, id)
+		flushHostQueue(conns[id], id)
+	}
+}
+
+// Journals are kept as long as a complaint needs looking into, not for years:
+// the trail "object, time, key" is a log of someone's life. The sweep lives in
+// the worker, so every installation has it, not only one with a crontab.
+// Batches keep a big table from being locked for long.
+func retentionSweep() {
+	for _, q := range []string{
+		`DELETE FROM call_log WHERE ts < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
+		`DELETE FROM audit_log WHERE ts < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
+		`DELETE FROM pending_host_msgs WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY) LIMIT 5000`,
+		`DELETE FROM org_requests WHERE status IN ('new','claimed') AND expires_at < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
+	} {
+		for i := 0; i < 100; i++ {
+			res, err := db.Exec(q)
+			if err != nil {
+				break
+			}
+			if n, _ := res.RowsAffected(); n < 5000 {
+				break
+			}
 		}
 	}
 }

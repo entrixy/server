@@ -16,6 +16,8 @@ if ($st->rowCount() > 0) {
     $had->execute([$id]);
     $keys = $had->fetchAll(PDO::FETCH_COLUMN);
     db()->prepare('DELETE FROM key_numbers WHERE number_id = ?')->execute([$id]);
+    // Открытия удалённого объекта, ещё ждущие в очереди, ему уже не нужны.
+    db()->prepare('DELETE FROM pending_actions WHERE number_id = ? AND host_id = ?')->execute([$id, $host_id]);
     $revoked = key_objects_lost($keys);
 }
 audit_log($host_id, 'number_delete', 'number', $id);

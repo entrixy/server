@@ -51,7 +51,9 @@ $st->execute([(int)$who['id']]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'not_found'], 404);
 if (!(int)$row['enabled']) jout(['error' => 'disabled'], 403);
-if (!guest_key_live((int)$row['id'])) jout(['error' => 'disabled'], 403);
+// На паузе ключ всё равно оседает на аппарате: владелец включит — заработает.
+// Истёкший не оседает.
+if (guest_key_state((int)$row['id']) === 'expired') jout(['error' => 'expired'], 403);
 
 $current = $row['bound_device_fp'] ?? null;
 $kid = (int)$row['id'];

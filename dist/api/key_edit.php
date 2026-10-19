@@ -46,7 +46,8 @@ if (!$valid && !empty($number_ids)) jout(['error' => 'no_numbers'], 400);
 // Object names for a company arrive in the clear: the owner decides that the
 // service may see them, as in key_create.
 $org_labels = [];
-if (is_array($j['org_labels'] ?? null)) {
+// Только ключу компании: остальным названия объектов на сервере не нужны.
+if (!empty($row['org_id']) && is_array($j['org_labels'] ?? null)) {
     foreach ($j['org_labels'] as $nid => $label) $org_labels[(int)$nid] = mb_substr(trim((string)$label), 0, 64);
 }
 $valid = array_values(array_unique(array_merge($valid, $keep_ble)));

@@ -104,6 +104,19 @@ function guest_auth(array $j, string $endpoint, string $rawBody, ?string &$via =
 
 /** The key works right now: enabled, not switched off by the owner, not expired.
  *  One rule for every guest endpoint, the same the websocket worker applies. */
+/** Why a key does not work right now: "" (it works), "paused" (switched off by
+ *  the owner, comes back), "expired" or "gone". Paused is not dead: the app
+ *  keeps the key and does not file the link as rejected. */
+function guest_key_state(int $keyId): string {
+    $st = db()->prepare("SELECT enabled, COALESCE(mode, 'auto') AS m, expires_at FROM user_keys WHERE id = ?");
+    $st->execute([$keyId]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$r || !(int)$r['enabled']) return 'gone';
+    if (!empty($r['expires_at']) && strtotime($r['expires_at']) <= time()) return 'expired';
+    if ($r['m'] === 'off') return 'paused';
+    return '';
+}
+
 function guest_key_live(int $keyId): bool {
     $st = db()->prepare("SELECT 1 FROM user_keys WHERE id = ? AND enabled = 1
                          AND COALESCE(mode, 'auto') <> 'off'

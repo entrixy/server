@@ -5,6 +5,24 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Openings are not lost and journals do not pile up.** An opening queued for an
+owner whose phone is reconnecting waits up to 30 seconds instead of being
+dropped, is claimed by one worker only, and is skipped for a key revoked
+meanwhile. The worker now sweeps the journals itself every hour (openings and
+audit 30 days, owner queue 7 days, stale company requests), so installations
+without a crontab keep no lifelong log. Revoking a key tree and rewriting a
+key's objects are single transactions. A paused key (`mode off`) answers
+`paused`, an expired one `expired`. Database:
+
+```sql
+ALTER TABLE key_numbers ADD KEY number_id (number_id);
+ALTER TABLE call_log ADD KEY key_ts (user_key_id, ts);
+ALTER TABLE org_requests ADD KEY user_key_id (user_key_id);
+ALTER TABLE orgs ADD UNIQUE KEY domain (domain), ADD UNIQUE KEY user_id (user_id);
+```
+
+The schema dump now loads into MySQL and older MariaDB. App 10.54.
+
 **An owner's access moves only by an explicit claim.** A request with another
 device's fingerprint is refused (`wrong_device`) instead of moving the access
 silently; moving is `host_claim.php` alone. Set `$GLOBALS['require_device_fp'] = true`

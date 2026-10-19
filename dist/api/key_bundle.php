@@ -16,7 +16,9 @@ $j = jin();
 // checks it. The key string itself never reaches the server.
 $row = guest_auth($j, 'key_bundle', $raw);
 if (!$row) jout(['error' => 'not_found'], 404);
-if (!(int)$row['enabled'] || !guest_key_live((int)$row['id'])) jout(['error' => 'disabled'], 403);
+if (!(int)$row['enabled']) jout(['error' => 'disabled'], 403);
+$why = guest_key_state((int)$row['id']);
+if ($why !== '') jout(['error' => $why === 'gone' ? 'disabled' : $why], 403);
 
 jout([
     'bundle_cipher' => $row['bundle_cipher'],

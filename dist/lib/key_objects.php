@@ -53,13 +53,23 @@ function key_obj_read(int $keyId): array {
 
 /** Replace the objects of a key, then bring the key's summary up to date. */
 function key_obj_write(int $keyId, array $settings, array $orgLabels = []): void {
-    db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?')->execute([$keyId]);
-    $ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id, org_label, native_only, delegate_depth, pass_pool)
-                          VALUES (?,?,?,?,?,?)');
-    foreach ($settings as $id => $s) {
-        $ins->execute([$keyId, (int)$id, $orgLabels[$id] ?? null, $s['n'], $s['d'], $s['p']]);
+    // Удалить и записать заново — одним целым: иначе между ними ключ на миг без
+    // объектов, а сбой посередине оставил бы его пустым.
+    $own = !db()->inTransaction();
+    if ($own) db()->beginTransaction();
+    try {
+        db()->prepare('DELETE FROM key_numbers WHERE user_key_id = ?')->execute([$keyId]);
+        $ins = db()->prepare('INSERT INTO key_numbers (user_key_id, number_id, org_label, native_only, delegate_depth, pass_pool)
+                              VALUES (?,?,?,?,?,?)');
+        foreach ($settings as $id => $s) {
+            $ins->execute([$keyId, (int)$id, $orgLabels[$id] ?? null, $s['n'], $s['d'], $s['p']]);
+        }
+        key_obj_summary($keyId);
+        if ($own) db()->commit();
+    } catch (\Throwable $e) {
+        if ($own) db()->rollBack();
+        throw $e;
     }
-    key_obj_summary($keyId);
 }
 
 function key_obj_summary(int $keyId): void {
