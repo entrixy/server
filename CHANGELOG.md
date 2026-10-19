@@ -5,6 +5,9 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**At most 200 controllers per phone.** `device_register` refuses past that with
+`limit_reached`: a controller is made per object, and more is a loop or abuse.
+
 **Calls and statuses.** An owner's "allow" counts for three minutes after the
 press; a later one is a refusal, the guest is told so and the owner gets
 `confirm_expired`. A call status relayed from the owner carries `number_id`, so

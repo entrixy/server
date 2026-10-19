@@ -6,8 +6,8 @@
 require __DIR__ . '/_bootstrap.php';
 [$host_id, $j] = host_auth();
 
-// Against guessing the claim code: the space is four bytes, and hammering it is
-// not allowed.
+// Against guessing the claim code: the space is six bytes, and hammering it is
+// not allowed either.
 rate_limit_check('device_claim', 20);
 
 $code = strtoupper(trim((string)($j['claim_code'] ?? '')));
