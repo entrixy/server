@@ -18,8 +18,19 @@ if (!$row || !(int)$row['enabled']) jout(['error' => 'not_found'], 404);
 $ukid = (int)$row['id'];
 if (!$ukid) jout(['error' => 'not_found'], 404);
 
+// The acknowledgement names its message by the start of the SHA-256 of its
+// cipher: a newer message from the owner that took the slot in the meantime is
+// neither deleted nor reported as read.
+$h = (string)($j['h'] ?? '');
+if (!preg_match('/^[0-9a-f]{24}$/', $h)) jout(['error' => 'bad_input'], 400);
 if ($kind === 'read') {
-    db()->prepare('DELETE FROM guest_messages WHERE user_key_id = ?')->execute([$ukid]);
+    $st = db()->prepare('DELETE FROM guest_messages WHERE user_key_id = ? AND LEFT(SHA2(cipher, 256), 24) = ?');
+    $st->execute([$ukid, $h]);
+    if (!$st->rowCount()) jout(['ok' => true, 'stale' => true]);
+} else {
+    $st = db()->prepare('SELECT 1 FROM guest_messages WHERE user_key_id = ? AND LEFT(SHA2(cipher, 256), 24) = ?');
+    $st->execute([$ukid, $h]);
+    if (!$st->fetchColumn()) jout(['ok' => true, 'stale' => true]);
 }
 db()->prepare(
     'INSERT INTO pending_notifications (kind, user_key_id, created_at)

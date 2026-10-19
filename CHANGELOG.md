@@ -5,6 +5,11 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**A read receipt names its message.** `message_ack` takes `h`, the first 24 hex
+digits of the SHA-256 of the message cipher, and refuses a request without it:
+a newer message from the owner that took the guest's slot meanwhile is neither
+deleted nor reported as read. Apps from 10.68 send it.
+
 **On by default: the device fingerprint check.** `REQUIRE_DEVICE_FP` now defaults
 to on — an owner request without the handset's fingerprint is refused once the
 access is bound. Set `REQUIRE_DEVICE_FP=0` only while phones still run an app
