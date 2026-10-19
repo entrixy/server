@@ -11,9 +11,7 @@ at that moment (objects, levels, "app only"), not when the link was made. A part
 not yet bound to a handset cannot be taken over by opening the link again, and
 one request accepts at most 16 parts. Editing a key validates everything first
 and writes in one transaction. A company is told `revoked` both for another
-company's key and for a deleted one; a paused key lists no objects. The admin
-letter goes out for a new company only, and a blocked company cannot rename
-itself. A guest may ask for pictures of objects in its own key only; a guest
+company's key and for a deleted one; a paused key lists no objects. A guest may ask for pictures of objects in its own key only; a guest
 whose clock is off is told `clock` instead of being dropped silently.
 
 **Websocket worker.** A phone refused at the greeting (wrong handset, wrong
