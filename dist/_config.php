@@ -37,6 +37,8 @@ $GLOBALS['jwt_secret']        = envv('JWT_SECRET');
 $GLOBALS['jwt_ttl']           = 30 * 86400;
 // A closed server: while no code is set, anyone may register a device.
 $GLOBALS['access_code']     = envv('ACCESS_CODE', '');
+// Refuse owner requests that carry no device fingerprint (apps 10.53+ always send one).
+$GLOBALS['require_device_fp'] = in_array(strtolower(envv('REQUIRE_DEVICE_FP', '')), ['1', 'true', 'yes'], true);
 // Whose page may read this server's answers in a browser. The browser client
 // lives at entrixy.com; point this at yourself if you host a copy of it.
 $GLOBALS['app_origin']      = envv('APP_ORIGIN', 'https://entrixy.com');
@@ -53,9 +55,16 @@ if (is_file(__DIR__ . '/_config.local.php')) {
     require __DIR__ . '/_config.local.php';
 }
 
-if ($GLOBALS['jwt_secret'] === '') {
+// A secret copied from the example is public: anyone could sign tokens with it.
+if ($GLOBALS['jwt_secret'] === '' || strlen($GLOBALS['jwt_secret']) < 32
+    || stripos($GLOBALS['jwt_secret'], 'CHANGE_ME') !== false) {
     http_response_code(500);
-    exit('JWT_SECRET is not set: fill in .env, or _config.local.php when running without Docker.');
+    exit('JWT_SECRET is not set or still the example value: put 32+ random characters in .env '
+       . '(openssl rand -hex 32), or in _config.local.php when running without Docker.');
+}
+if (stripos((string)($GLOBALS['db']['pass'] ?? ''), 'CHANGE_ME') !== false) {
+    http_response_code(500);
+    exit('DB_PASS is still the example value: set a real password in .env.');
 }
 
 require __DIR__ . '/_config_functions.php';

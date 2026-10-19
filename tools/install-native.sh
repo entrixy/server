@@ -62,23 +62,22 @@ else
         say "   Generated an attestation value of your own. Put the same one into"
         say "   your build, or keys marked \"app only\" will not open."
     fi
-    cat > "$local_cfg" <<CFG
-<?php
-// Written by tools/install-native.sh. An update never touches this file.
-\$GLOBALS['db'] = [
-    'host' => '$dbh',
-    'name' => '$db',
-    'user' => '$user',
-    'pass' => '$pass',
-];
-\$GLOBALS['site_host']         = '$host';
-\$GLOBALS['download_page_url'] = 'https://$host/download';
-\$GLOBALS['jwt_secret']        = '$jwt';
-\$GLOBALS['app_attest_secret'] = '$att';
-\$GLOBALS['access_code']       = '';
-\$GLOBALS['ws_host']           = '127.0.0.1';
-\$GLOBALS['ws_port']           = 8095;
-CFG
+    # Values go in through var_export: a quote or a backslash in a password must
+    # not break the PHP file (and with it the whole site).
+    E_DBH="$dbh" E_DB="$db" E_USER="$user" E_PASS="$pass" E_HOST="$host" E_JWT="$jwt" E_ATT="$att" \
+    php -r '
+        $v = fn($k) => var_export((string)getenv($k), true);
+        echo "<?php\n// Written by tools/install-native.sh. An update never touches this file.\n";
+        echo "\$GLOBALS[\"db\"] = [\"host\" => " . $v("E_DBH") . ", \"name\" => " . $v("E_DB")
+           . ", \"user\" => " . $v("E_USER") . ", \"pass\" => " . $v("E_PASS") . "];\n";
+        echo "\$GLOBALS[\"site_host\"] = " . $v("E_HOST") . ";\n";
+        echo "\$GLOBALS[\"download_page_url\"] = " . var_export("https://" . getenv("E_HOST") . "/download", true) . ";\n";
+        echo "\$GLOBALS[\"jwt_secret\"] = " . $v("E_JWT") . ";\n";
+        echo "\$GLOBALS[\"app_attest_secret\"] = " . $v("E_ATT") . ";\n";
+        echo "\$GLOBALS[\"access_code\"] = \"\";\n";
+        echo "\$GLOBALS[\"ws_host\"] = \"127.0.0.1\";\n\$GLOBALS[\"ws_port\"] = 8095;\n";
+    ' > "$local_cfg"
+    php -l "$local_cfg" >/dev/null || { say "   Could not write $local_cfg correctly"; exit 1; }
     chmod 600 "$local_cfg"
     chown "$(stat -c '%U' "$dist")" "$local_cfg" 2>/dev/null || true
     say "1. Settings written to $local_cfg, secrets generated."
@@ -142,6 +141,7 @@ say ""
 
 # ── 5. the web server ────────────────────────────────────────────────────────
 say "5. Point your web server at $dist and proxy /ws to 127.0.0.1:8095."
-say "   An nginx example is in nginx-entrixy.conf.example."
+say "   For nginx with PHP-FPM use nginx-entrixy-native.conf.example: it holds the"
+say "   clean addresses and the denials that Apache would read from .htaccess."
 say ""
 say "When it is up:  curl https://YOUR-DOMAIN/healthz"

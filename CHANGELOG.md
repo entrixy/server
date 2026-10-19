@@ -5,6 +5,16 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Installation.** A server closed by invitations stays closed when they are used
+up or expire; only revoking every invitation opens it, and a database error no
+longer opens it. The backup command in the README now produces a usable dump
+(with a restore command). A migration that fails on one change goes on with the
+rest and says so. The server refuses to start on the example `JWT_SECRET` or
+`DB_PASS`. `REQUIRE_DEVICE_FP` in `.env`. The installer without Docker writes
+settings safely for any password, and `nginx-entrixy-native.conf.example` is a
+working nginx + PHP-FPM sample. The archive now carries `LICENSE` and
+`.gitignore`.
+
 **Openings are not lost and journals do not pile up.** An opening queued for an
 owner whose phone is reconnecting waits up to 30 seconds instead of being
 dropped, is claimed by one worker only, and is skipped for a key revoked

@@ -12,7 +12,7 @@
  * expiry date and a note saying who it went to. Registration burns it, so a
  * code someone peeked at is worthless — it has already been used. Once the
  * first invitation exists, the server is closed: entry is by the shared code
- * or by a valid invitation.
+ * or by a valid invitation, and stays closed when the invitations run out.
  */
 
 /** The code from the request: the app puts it in the body, a header also works. */
@@ -23,18 +23,22 @@ function access_code_given(array $j): string
     return trim($v);
 }
 
-/** Whether a single live invitation exists on this server. */
+/**
+ * Whether the server is closed by invitations: one exists that the owner has
+ * not revoked. Used up or expired, it still keeps the server closed — the
+ * owner closed it once, and running out of codes must not open it to the
+ * street. Only revoking every invitation opens it again.
+ */
 function access_invites_live(): bool
 {
     try {
         return (bool)db()->query(
-            'SELECT 1 FROM access_invites
-              WHERE revoked_at IS NULL AND uses_left > 0
-                AND (expires_at IS NULL OR expires_at > NOW())
-              LIMIT 1'
+            'SELECT 1 FROM access_invites WHERE revoked_at IS NULL LIMIT 1'
         )->fetchColumn();
-    } catch (Throwable $e) {
-        return false;                       // tables not there yet — server is open
+    } catch (PDOException $e) {
+        // No table yet (a fresh install before its first migration): open.
+        // Any other failure: closed — a database hiccup must not let anyone in.
+        return $e->getCode() !== '42S02';
     }
 }
 

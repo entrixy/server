@@ -37,14 +37,21 @@ $sql = file_get_contents($file);
 preg_match_all('/CREATE TABLE `([a-z_]+)` \((.*?)\n\) ([^;]*);/s', $sql, $m, PREG_SET_ORDER);
 
 $added = 0;
+// One failed statement (say, a unique key over rows that repeat) must not skip
+// every table after it: each change is tried on its own, failures are listed
+// at the end, and the exit code says the schema is not complete.
+$failed = [];
+$try = function (string $sql, string $what) use ($db, &$failed, &$added): void {
+    try { $db->exec($sql); echo "$what\n"; $added++; }
+    catch (Throwable $e) { $failed[] = "$what: " . $e->getMessage(); echo "FAILED $what: {$e->getMessage()}\n"; }
+};
+
 foreach ($m as $t) {
     [$whole, $table, $body, $opts] = $t;
 
     $have = $db->query("SHOW TABLES LIKE " . $db->quote($table))->fetch();
     if (!$have) {
-        $db->exec($whole);
-        echo "table $table created\n";
-        $added++;
+        $try($whole, "table $table created");
         continue;
     }
 
@@ -62,9 +69,7 @@ foreach ($m as $t) {
             [, $col, $def] = $c;
             if (!isset($cols[$col])) {
                 $where = $prev ? "AFTER `$prev`" : 'FIRST';
-                $db->exec("ALTER TABLE `$table` ADD COLUMN `$col` $def $where");
-                echo "column $table.$col added\n";
-                $added++;
+                $try("ALTER TABLE `$table` ADD COLUMN `$col` $def $where", "column $table.$col added");
             }
             $prev = $col;
             continue;
@@ -73,12 +78,14 @@ foreach ($m as $t) {
         if (preg_match('/^(UNIQUE KEY|KEY) `([a-z0-9_]+)` (.+)$/i', $line, $k)) {
             [, $kind, $kn, $rest] = $k;
             if (!isset($keys[$kn])) {
-                $db->exec("ALTER TABLE `$table` ADD $kind `$kn` $rest");
-                echo "index $table.$kn added\n";
-                $added++;
+                $try("ALTER TABLE `$table` ADD $kind `$kn` $rest", "index $table.$kn added");
             }
         }
     }
 }
 
 echo $added ? "schema updated, changes: $added\n" : "schema is up to date\n";
+if ($failed) {
+    fwrite(STDERR, "schema NOT complete, " . count($failed) . " change(s) failed:\n  " . implode("\n  ", $failed) . "\n");
+    exit(1);
+}

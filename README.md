@@ -36,7 +36,7 @@ keep one program running — see "Installing without Docker" below.
 
     git clone https://github.com/entrixy/server.git entrixy-server
     cd entrixy-server
-    cp .env.example .env
+    cp .env.example .env && chmod 600 .env     # passwords and the signing secret live here
     nano .env                      # domain, database passwords, secrets
     docker compose up -d --build
 
@@ -44,7 +44,7 @@ The first start takes a few minutes: images are built and the database schema
 is loaded. The containers listen on the loopback address only — the web part
 on `127.0.0.1:8082`, the websocket on `127.0.0.1:8095`.
 
-Two values in `.env` have to be generated rather than invented:
+One value in `.env` has to be generated rather than invented:
 
     openssl rand -hex 32           # JWT_SECRET
 
@@ -77,9 +77,12 @@ only".
 **If nginx already runs on the machine** — which is usually the case on a
 server hosting other sites — ports 80 and 443 stay with it. Create a subdomain,
 issue a certificate the way your panel normally does, then add the proxying.
-There are two samples, and the choice between them matters:
+There are three samples, and the choice between them matters:
 
-* `nginx-entrixy.conf.example` — for an nginx you edit by hand: a whole
+* `nginx-entrixy-native.conf.example` — for an installation without Docker
+  (`tools/install-native.sh`): nginx with PHP-FPM; it carries the clean
+  addresses and the denials that Apache takes from `.htaccess`;
+* `nginx-entrixy.conf.example` — for the Docker stack behind an nginx you edit by hand: a whole
   `server` block with its own certificate;
 * `nginx-entrixy-panel.conf.example` — for a control panel (Hestia,
   ISPmanager). There the include is inserted into an existing `server` block
@@ -487,13 +490,12 @@ the server does not see them with or without an account.
 
 ## The server address inside controllers
 
-A controller goes to the address baked into its program at build time. By
-default the builder inserts the address of the server it is built on, so
-firmware built on yours connects back to yours. The address is set explicitly
-by the `ws_host` field (and `ws_port`) in the request to
-`api/esp_compile.php`; the configurator interface deliberately has no such
-field, so that an ordinary person cannot send their controller to someone
-else's machine with a stray click.
+A controller goes to the address baked into its program at build time.
+Firmware is built in the configurator at entrixy.com — the build pipeline is
+not part of this package. The address travels in the device code: for a
+controller on your server the app shows the code as `<code>@your.server`, and
+the configurator writes that server into the firmware. Nobody types an address
+by hand, so a stray click cannot send a controller to someone else's machine.
 
 In the firmware the address is the `WS_HOST` constant; in the Raspberry and
 Node scripts it is the `WS_URL` string. If you build firmware your own way,
@@ -567,7 +569,17 @@ image matter more than reproducing a size down to the byte.
 
 ## Backup
 
-    docker compose exec db mariadb-dump -u root -p"$DB_ROOT_PASS" entrixy > backup.sql
+    docker compose exec -T db sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" \
+        --single-transaction --hex-blob "$MARIADB_DATABASE"' > backup.sql
+    chmod 600 backup.sql
+
+The password and the database name are read inside the container, from its own
+environment; `-T` keeps the terminal from rewriting the output, and `--hex-blob`
+keeps the binary key columns intact.
+
+Restore into a running stack:
+
+    docker compose exec -T db sh -c 'mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' < backup.sql
 
 Keys are stored encrypted: the server does not read them, and nothing needs
 decrypting when moving to another machine.
