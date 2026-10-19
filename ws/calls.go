@@ -66,7 +66,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	c.mu.Lock()
 	c.keyMode = currentMode
 	c.mu.Unlock()
-	if currentMode == "off" {
+	if currentMode == "off" || !ancestorsLive(userKeyID) {
 		c.send(map[string]any{"type": "error", "reason": "disabled"})
 		return
 	}
@@ -108,7 +108,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	// that fails refuses, rather than lifting the limit.
 	var recent int
 	if queryRow(`SELECT COUNT(*) FROM call_log
-	          WHERE user_key_id = ? AND status = 'requested'
+	          WHERE user_key_id = ? AND status LIKE 'requested%'
 	            AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`, userKeyID).
 		Scan(&recent) != nil || recent >= cfg.RateLimitPerMin {
 		c.send(map[string]any{"type": "error", "reason": "rate_limit"})
@@ -575,4 +575,27 @@ func notifyPassOpen(userKeyID int64) {
 			g.send(map[string]any{"type": "pass_open"})
 		}
 	}
+}
+
+// ancestorsLive: every key above this one is switched on, not paused and not
+// expired. A key passed on lives only while the one it came through does.
+func ancestorsLive(userKeyID int64) bool {
+	id := userKeyID
+	for i := 0; i < 50; i++ {
+		var parent sql.NullInt64
+		if queryRow(`SELECT parent_key_id FROM user_keys WHERE id = ?`, id).Scan(&parent) != nil {
+			return false
+		}
+		if !parent.Valid || parent.Int64 == 0 {
+			return true
+		}
+		id = parent.Int64
+		var live int
+		if queryRow(`SELECT (enabled = 1 AND COALESCE(mode, 'auto') <> 'off'
+		                     AND (expires_at IS NULL OR expires_at > NOW()))
+		             FROM user_keys WHERE id = ?`, id).Scan(&live) != nil || live != 1 {
+			return false
+		}
+	}
+	return false
 }

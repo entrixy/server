@@ -139,6 +139,11 @@ func pumpPendingActions() {
 		if h == nil {
 			continue
 		}
+		// Paused or expired higher up the chain: the opening goes.
+		if !ancestorsLive(a.userKeyID) {
+			exec(`DELETE FROM pending_actions WHERE id = ?`, a.id)
+			continue
+		}
 		// Claimed by deleting it: only the one who deleted the row sends it, so a
 		// second worker (a restart overlap) cannot open twice.
 		res, err := db.Exec(`DELETE FROM pending_actions WHERE id = ?`, a.id)

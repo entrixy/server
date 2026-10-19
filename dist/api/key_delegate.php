@@ -370,8 +370,8 @@ if ($action === 'redeem') {
         // Is the parent still alive?
         $par->execute([(int)$inv['parent_key_id']]);
         $pk = $par->fetch(PDO::FETCH_ASSOC);
-        if (!$pk || !(int)$pk['enabled'] || ($pk['mode'] ?? 'auto') === 'off'
-            || ($pk['expires_at'] && strtotime($pk['expires_at']) < time())) {
+        // The whole chain above: a key passed on from a paused one is paused too.
+        if (!$pk || guest_key_state((int)$pk['id']) !== '') {
             $out[] = ['code' => $code, 'error' => 'parent_revoked']; continue;
         }
         // Settings of each object as the holder chose them. The chain may have

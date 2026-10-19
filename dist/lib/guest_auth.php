@@ -107,20 +107,21 @@ function guest_auth(array $j, string $endpoint, string $rawBody, ?string &$via =
 /** Why a key does not work right now: "" (it works), "paused" (switched off by
  *  the owner, comes back), "expired" or "gone". Paused is not dead: the app
  *  keeps the key and does not file the link as rejected. */
+// The key and every key above it: a key passed on lives only while the one it
+// came through does — paused, expired or gone above means the same here.
 function guest_key_state(int $keyId): string {
-    $st = db()->prepare("SELECT enabled, COALESCE(mode, 'auto') AS m, expires_at FROM user_keys WHERE id = ?");
-    $st->execute([$keyId]);
-    $r = $st->fetch(PDO::FETCH_ASSOC);
-    if (!$r || !(int)$r['enabled']) return 'gone';
-    if (!empty($r['expires_at']) && strtotime($r['expires_at']) <= time()) return 'expired';
-    if ($r['m'] === 'off') return 'paused';
+    $st = db()->prepare("SELECT enabled, COALESCE(mode, 'auto') AS m, expires_at, parent_key_id FROM user_keys WHERE id = ?");
+    for ($id = $keyId, $i = 0; $id && $i < 50; $i++) {
+        $st->execute([$id]);
+        $r = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$r || !(int)$r['enabled']) return 'gone';
+        if (!empty($r['expires_at']) && strtotime($r['expires_at']) <= time()) return 'expired';
+        if ($r['m'] === 'off') return 'paused';
+        $id = (int)$r['parent_key_id'];
+    }
     return '';
 }
 
 function guest_key_live(int $keyId): bool {
-    $st = db()->prepare("SELECT 1 FROM user_keys WHERE id = ? AND enabled = 1
-                         AND COALESCE(mode, 'auto') <> 'off'
-                         AND (expires_at IS NULL OR expires_at > NOW())");
-    $st->execute([$keyId]);
-    return (bool)$st->fetchColumn();
+    return guest_key_state($keyId) === '';
 }

@@ -32,10 +32,12 @@ $st = db()->prepare(
 $st->execute([(int)$who['id'], $number_id]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'forbidden'], 403);
+// A key passed on stops with the key it came through: paused or expired above.
+if (guest_key_state((int)$row['user_key_id']) !== '') jout(['error' => 'disabled'], 403);
 
 $st = db()->prepare(
     'SELECT COUNT(*) FROM call_log
-     WHERE user_key_id = ? AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)'
+     WHERE user_key_id = ? AND status LIKE "requested%" AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)'
 );
 $st->execute([$row['user_key_id']]);
 if ((int)$st->fetchColumn() >= $GLOBALS['rate_limit_per_min']) {
