@@ -104,7 +104,7 @@ func hubLen[T any](m map[int64]T) int {
 // company calling in, or a guest whose websocket is down.
 func pumpPendingActions() {
 	rows, ok := query(`SELECT pa.id, pa.host_id, pa.number_id, pa.user_key_id, pa.source, pa.actor,
-	                          o.name AS org_name, pa.press
+	                          o.name AS org_name, pa.press, pa.created_at
 	                   FROM pending_actions pa
 	                   JOIN user_keys uk ON uk.id = pa.user_key_id
 	                     AND uk.enabled = 1 AND COALESCE(uk.mode, 'auto') <> 'off'
@@ -118,11 +118,12 @@ func pumpPendingActions() {
 	type action struct {
 		id, hostID, numberID, userKeyID int64
 		source, actor, orgName, press   sql.NullString
+		createdAt                       sql.NullString
 	}
 	var list []action
 	for rows.Next() {
 		var a action
-		if rows.Scan(&a.id, &a.hostID, &a.numberID, &a.userKeyID, &a.source, &a.actor, &a.orgName, &a.press) == nil {
+		if rows.Scan(&a.id, &a.hostID, &a.numberID, &a.userKeyID, &a.source, &a.actor, &a.orgName, &a.press, &a.createdAt) == nil {
 			list = append(list, a)
 		}
 	}
@@ -169,7 +170,15 @@ func pumpPendingActions() {
 				out["press"] = p
 			}
 		}
-		h.send(out)
+		// The owner went away between the lookup and now: the row goes back and
+		// waits for the next connection instead of being lost.
+		b, err := json.Marshal(out)
+		if err != nil || !h.sendWait(b, 5*time.Second) {
+			hub.dropCall(callID)
+			exec(`INSERT INTO pending_actions (id, user_key_id, number_id, host_id, source, actor, press, created_at)
+			      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, a.id, a.userKeyID, a.numberID, a.hostID,
+				a.source, a.actor, a.press, a.createdAt)
+		}
 	}
 	exec(`DELETE FROM pending_actions WHERE created_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)`)
 }

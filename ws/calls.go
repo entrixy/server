@@ -103,11 +103,14 @@ func guestCall(c *Conn, msg map[string]any) {
 		return
 	}
 
+	// Presses only: every opening also leaves dialing, busy and controller
+	// lines, which would make the limit two or three times tighter. A count
+	// that fails refuses, rather than lifting the limit.
 	var recent int
-	queryRow(`SELECT COUNT(*) FROM call_log
-	          WHERE user_key_id = ? AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`, userKeyID).
-		Scan(&recent)
-	if recent >= cfg.RateLimitPerMin {
+	if queryRow(`SELECT COUNT(*) FROM call_log
+	          WHERE user_key_id = ? AND status = 'requested'
+	            AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`, userKeyID).
+		Scan(&recent) != nil || recent >= cfg.RateLimitPerMin {
 		c.send(map[string]any{"type": "error", "reason": "rate_limit"})
 		return
 	}
@@ -545,7 +548,7 @@ func flushHostQueue(host *Conn, hostID int64) {
 	rows.Close()
 	sent := 0
 	for _, r := range list {
-		if !host.trySend([]byte(r.payload)) {
+		if !host.sendWait([]byte(r.payload), 10*time.Second) {
 			break // the rest waits for the next connection
 		}
 		exec(`DELETE FROM pending_host_msgs WHERE id = ?`, r.id)

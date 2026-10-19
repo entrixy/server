@@ -76,6 +76,9 @@ func handleMessage(c *Conn, data []byte) {
 		return
 	}
 	typ := str(msg, "type")
+	if c.closing.Load() {
+		return
+	}
 
 	// Pace per connection. The owner's phone relays for all its guests and gets
 	// more room; a guest, a controller or a stranger — ten a second, bursts to
@@ -110,6 +113,12 @@ func handleMessage(c *Conn, data []byte) {
 	c.rateTokens--
 	c.rateDrops = 0
 
+	// One greeting per connection: a second one of another kind would leave the
+	// first role registered in the hub after the connection is gone.
+	if (typ == "host_hello" || typ == "guest_hello" || typ == "device_hello") && c.snapRole() != "" {
+		c.close()
+		return
+	}
 	if typ == "host_hello" || typ == "guest_hello" {
 		key := "h:" + str(msg, "device_id")
 		if typ == "guest_hello" {
@@ -120,6 +129,7 @@ func handleMessage(c *Conn, data []byte) {
 			c.close()
 			return
 		}
+		key += "|" + c.ip
 		hub.helloMu.Lock()
 		prev := hub.lastHello[key]
 		now := time.Now()
@@ -229,17 +239,16 @@ func hostHello(c *Conn, msg map[string]any) {
 	err := queryRow(`SELECT id, secret_hash, bound_device_fp FROM hosts WHERE device_id = ?`,
 		deviceID).Scan(&id, &secretHash, &boundFP)
 	sum := sha256.Sum256([]byte(secret))
+	if err != nil && err != sql.ErrNoRows {
+		// A database hiccup is not a wrong secret: "auth" would send the phone
+		// into registering again.
+		c.sendThenClose(map[string]any{"type": "error", "reason": "server_error"})
+		return
+	}
 	if err != nil || !hmac.Equal([]byte(secretHash.String), []byte(hex.EncodeToString(sum[:]))) {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "auth"})
 		return
 	}
-
-	c.mu.Lock()
-	c.role = "host"
-	c.hostID = id
-	c.clientLang = str(msg, "lang")
-	c.deviceFP = fp
-	c.mu.Unlock()
 
 	// Moving to another phone: the new handset took the access and this one is
 	// the old one. We say so here rather than waiting to be asked. A greeting
@@ -252,6 +261,14 @@ func hostHello(c *Conn, msg map[string]any) {
 		c.sendThenClose(map[string]any{"type": "evicted"})
 		return
 	}
+
+	// The owner's powers start only now, after every check.
+	c.mu.Lock()
+	c.role = "host"
+	c.hostID = id
+	c.clientLang = str(msg, "lang")
+	c.deviceFP = fp
+	c.mu.Unlock()
 
 	// One connection per owner: the previous one (a replaced handset, a dead
 	// socket) is closed, or it would keep the owner's powers unwatched.
@@ -422,9 +439,18 @@ func guestHello(c *Conn, msg map[string]any) {
 	// The key belongs to one handset. Nothing bound yet means the first one to
 	// connect is bound here; a different fingerprint afterwards is turned away.
 	bound := boundFP.String
+	// Two first greetings at once: only one write takes the key, the other
+	// reads back whose it became.
 	if bound == "" && deviceFP != "" {
-		exec(`UPDATE user_keys SET bound_device_fp = ?, bound_at = NOW() WHERE id = ?`, deviceFP, ukID)
-		bound = deviceFP
+		res, err := db.Exec(`UPDATE user_keys SET bound_device_fp = ?, bound_at = NOW()
+		                     WHERE id = ? AND (bound_device_fp IS NULL OR bound_device_fp = '')`, deviceFP, ukID)
+		if n, _ := res.RowsAffected(); err == nil && n == 1 {
+			bound = deviceFP
+		} else {
+			var now sql.NullString
+			queryRow(`SELECT bound_device_fp FROM user_keys WHERE id = ?`, ukID).Scan(&now)
+			bound = now.String
+		}
 	}
 	if bound != "" && (deviceFP == "" || !hmac.Equal([]byte(bound), []byte(deviceFP))) {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "already_bound"})

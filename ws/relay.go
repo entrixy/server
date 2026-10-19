@@ -128,6 +128,10 @@ func deviceHello(c *Conn, msg map[string]any) {
 	var secretHash sql.NullString
 	err := queryRow(`SELECT id, host_id, secret_hash FROM devices WHERE device_key = ?`, key).
 		Scan(&id, &hostID, &secretHash)
+	if err != nil && err != sql.ErrNoRows {
+		c.sendThenClose(map[string]any{"type": "error", "reason": "server_error"})
+		return
+	}
 	if err != nil || !sameHash(secretHash.String, secret) {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "auth"})
 		return

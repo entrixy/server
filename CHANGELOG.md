@@ -5,6 +5,18 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Websocket worker.** A phone refused at the greeting (wrong handset, wrong
+secret) no longer gets the owner's powers for the moment before it is closed,
+and a second greeting on one connection is refused. Closing a dead connection no
+longer holds up the caller for five seconds. The owner's stored queue is handed
+over at the pace of the link instead of overflowing and dropping the
+connection, and an opening the owner's phone could not take goes back into the
+queue. Greeting pacing counts per address, so someone repeating your id does
+not lock you out. A database hiccup answers `server_error`, not `auth`. Two
+first greetings of one guest key cannot bind it to two handsets. The per-minute
+limit counts presses only. Webhooks also refuse the benchmarking, reserved and
+broadcast ranges and IPv4 addresses inside NAT64 and 6to4.
+
 **Installation.** A server closed by invitations stays closed when they are used
 up or expire; only revoking every invitation opens it, and a database error no
 longer opens it. The backup command in the README now produces a usable dump

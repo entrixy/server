@@ -15,9 +15,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -110,6 +112,7 @@ func serveWS(w http.ResponseWriter, r *http.Request) {
 		out:      make(chan []byte, 256),
 		closed:   make(chan struct{}),
 		lastPong: time.Now(),
+		ip:       clientIP(r),
 	}
 
 	ctx := context.Background()
@@ -129,6 +132,24 @@ func serveWS(w http.ResponseWriter, r *http.Request) {
 	}()
 	readLoop(ctx, c)
 	onClose(c)
+}
+
+// The address the client came from: nginx in front passes it on, a direct
+// connection has it in RemoteAddr.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		if real := strings.TrimSpace(r.Header.Get("X-Real-IP")); real != "" {
+			return real
+		}
+		if f := r.Header.Get("X-Forwarded-For"); f != "" {
+			return strings.TrimSpace(strings.Split(f, ",")[0])
+		}
+	}
+	return host
 }
 
 func readLoop(ctx context.Context, c *Conn) {

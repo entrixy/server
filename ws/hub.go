@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -50,6 +51,12 @@ type Conn struct {
 	since  time.Time
 	// A controller has reported its position on this connection already.
 	posSeen bool
+	// The connection was refused and is only waiting for its last frame to go
+	// out: nothing it sends from now on is acted upon.
+	closing atomic.Bool
+	// The client's address, for pacing greetings: a stranger repeating someone
+	// else's id must not use up that person's slot.
+	ip string
 }
 
 func (c *Conn) setReason(r string) {
@@ -70,8 +77,22 @@ func (c *Conn) send(v any) {
 
 func (c *Conn) sendRaw(b []byte) { c.trySend(b) }
 
-// trySend reports whether the frame was queued: a stored message is deleted
-// only once it really left.
+// sendWait queues a frame, waiting up to d for room: a stored queue handed
+// over on a slow link must not overflow and drop the connection.
+func (c *Conn) sendWait(b []byte, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case c.out <- b:
+		return true
+	case <-c.closed:
+		return false
+	case <-t.C:
+		return false
+	}
+}
+
+// trySend reports whether the frame was queued.
 func (c *Conn) trySend(b []byte) bool {
 	select {
 	case c.out <- b:
@@ -92,6 +113,7 @@ func (c *Conn) trySend(b []byte) bool {
 // this: an "evicted" that never arrives leaves the old handset thinking it is
 // still the owner.
 func (c *Conn) sendThenClose(v any) {
+	c.closing.Store(true)
 	c.send(v)
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -102,7 +124,10 @@ func (c *Conn) sendThenClose(v any) {
 func (c *Conn) close() {
 	c.once.Do(func() {
 		close(c.closed)
-		c.ws.Close(websocket.StatusNormalClosure, "")
+		// Closing waits for the other side's answer, up to five seconds when it
+		// is gone: the caller (a new connection replacing this one, the ping
+		// timer going through every phone) must not wait with it.
+		go c.ws.Close(websocket.StatusNormalClosure, "")
 	})
 }
 

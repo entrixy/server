@@ -54,6 +54,18 @@ func privateIP(ip net.IP) bool {
 		if v4[0] == 0 || v4[0] == 169 && v4[1] == 254 {
 			return true
 		}
+		// Benchmarking, reserved and broadcast ranges.
+		if v4[0] == 198 && v4[1]&0xfe == 18 || v4[0] >= 240 {
+			return true
+		}
+	} else if len(ip) == net.IPv6len {
+		// NAT64 and 6to4 carry an IPv4 address inside: judged by that one.
+		if ip[0] == 0x00 && ip[1] == 0x64 && ip[2] == 0xff && ip[3] == 0x9b {
+			return privateIP(net.IP(ip[12:16]))
+		}
+		if ip[0] == 0x20 && ip[1] == 0x02 {
+			return privateIP(net.IP(ip[2:6]))
+		}
 	}
 	return false
 }
