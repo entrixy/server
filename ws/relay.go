@@ -511,10 +511,12 @@ func avatarData(c *Conn, msg map[string]any) {
 		return
 	}
 	payload := map[string]any{"type": "avatar_data", "number_id": numberID}
+	// The picture travels only sealed with the object key; an empty "data" says
+	// the object has none.
 	if cipher := str(msg, "avatar_cipher"); cipher != "" {
 		payload["avatar_cipher"] = cipher
 	} else {
-		payload["data"] = str(msg, "data")
+		payload["data"] = ""
 	}
 	g.send(payload)
 }

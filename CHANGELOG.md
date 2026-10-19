@@ -5,6 +5,10 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Pictures only sealed.** The worker relays an object's picture only as
+`avatar_cipher`, sealed with the object key; a plain `data` from the owner is
+dropped and the guest is told the object has none.
+
 **A paused chain passes nothing on.** A holder whose key sits under a paused,
 expired or revoked one can no longer start a link, add to it, edit what they
 passed on or write to its recipient; listing, cancelling, revoking and vouching
