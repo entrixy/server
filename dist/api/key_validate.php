@@ -34,6 +34,8 @@ if ($row) {
 jout([
     // Истёкший ключ уже не вернётся; выключенный владельцем — вернётся, он «жив».
     'valid'       => ($row && $row['enabled'] && (empty($row['expires_at']) || strtotime($row['expires_at']) > time())) ? 1 : 0,
+    // Отдельно — «истёк»: приложение скажет «попросите новый», а не «ключа нет».
+    'expired'     => ($row && !empty($row['expires_at']) && strtotime($row['expires_at']) <= time()) ? 1 : 0,
     'is_own'      => $isOwn,
     'host_active' => $hostActive,
 ]);
