@@ -9,7 +9,7 @@ header('Content-Type: text/html; charset=utf-8');
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<script <?= csp_nonce_attr() ?>>document.documentElement.lang=((localStorage.getItem('gon_lang')||navigator.language||navigator.userLanguage||'').slice(0,2)==='ru')?'ru':'en';</script>
+<script <?= csp_nonce_attr() ?>>try{document.documentElement.lang=((localStorage.getItem('gon_lang')||navigator.language||navigator.userLanguage||'').slice(0,2)==='ru')?'ru':'en';}catch(e){}</script>
 <title>Entrixy</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -74,8 +74,12 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   var browserLang = (navigator.language || '').slice(0, 2);
   var urlLang = new URLSearchParams(location.search).get('lang');
   var KNOWN = ['en','ru','de','es','fr','pt','zh'];
-  if (urlLang && KNOWN.indexOf(urlLang) >= 0) localStorage.setItem('gon_lang', urlLang);
-  var uiLang = localStorage.getItem('gon_lang') || '';
+  // The browser may forbid storage (blocked site data, in-app browsers): the
+  // page must still take the key, not hang on the spinner.
+  var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } } };
+  if (urlLang && KNOWN.indexOf(urlLang) >= 0) store.set('gon_lang', urlLang);
+  var uiLang = store.get('gon_lang') || '';
   if (KNOWN.indexOf(uiLang) < 0) uiLang = (['ru','de','es','fr','pt','zh'].indexOf(browserLang) >= 0 ? browserLang : 'en');
   var S = {
     ru: {
@@ -218,13 +222,13 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   }
 
   function saveKey() {
-    var keys = JSON.parse(localStorage.getItem('gon_keys') || '[]');
+    var keys; try { keys = JSON.parse(store.get('gon_keys') || '[]'); } catch (e) { keys = []; }
     var kb64 = parsed.kGuest ? EntrixyCrypto.b64uEncode(parsed.kGuest) : '';
     var ex = keys.find(function (x) { return x.user_key === parsed.userKey; });
     // The server goes with the key: this page is served by the key's own server.
     if (ex) { if (kb64) ex.k_guest_b64 = kb64; if (!ex.host) ex.host = location.host; }
     else keys.push({ user_key: parsed.userKey, k_guest_b64: kb64, host: location.host });
-    localStorage.setItem('gon_keys', JSON.stringify(keys));
+    store.set('gon_keys', JSON.stringify(keys));
   }
 
   function mkBtn(label, cls, onClick) {

@@ -119,10 +119,15 @@ func handleMessage(c *Conn, data []byte) {
 		c.close()
 		return
 	}
-	if typ == "host_hello" || typ == "guest_hello" {
+	if typ == "host_hello" || typ == "guest_hello" || typ == "device_hello" {
 		key := "h:" + str(msg, "device_id")
 		if typ == "guest_hello" {
 			key = "g:" + str(msg, "key_id")
+		}
+		// Controllers too: one with a wrong code retries every few seconds for
+		// ever, and every greeting is a database query.
+		if typ == "device_hello" {
+			key = "d:" + str(msg, "device_key")
 		}
 		// The key goes into a table: a real id is short, a long one is junk.
 		if len(key) > 80 {
@@ -480,6 +485,7 @@ func guestHello(c *Conn, msg map[string]any) {
 	}
 	c.mu.Lock()
 	c.role = "guest"
+	c.deviceFP = deviceFP   // which handset: a move closes only the others
 	c.userKeyID = ukID
 	c.hostID = hostID
 	c.keyMode = keyMode

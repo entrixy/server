@@ -211,8 +211,28 @@ func pumpNotifications() {
 	rows.Close()
 
 	for _, n := range list {
-		exec(`DELETE FROM pending_notifications WHERE id = ?`, n.id)
+		// Delivered by whoever deleted the row: two workers overlapping in a
+		// restart must not hand the same news out twice.
+		res, err := db.Exec(`DELETE FROM pending_notifications WHERE id = ?`, n.id)
+		if err != nil {
+			continue
+		}
+		if k, _ := res.RowsAffected(); k != 1 {
+			continue
+		}
 		switch n.kind {
+		case "key_moved":
+			// The key moved to another handset. Only connections from other
+			// handsets go, and silently: the phone that moved keeps its key, and a
+			// stale one is told the truth by its next greeting (already_bound).
+			var bound sql.NullString
+			queryRow(`SELECT bound_device_fp FROM user_keys WHERE id = ?`, n.keyID).Scan(&bound)
+			for _, g := range hub.guestsOfKey(n.keyID) {
+				if bound.String == "" || g.snapFP() != bound.String {
+					g.setReason("key moved to another handset")
+					g.close()
+				}
+			}
 		case "key_revoked":
 			for _, g := range hub.guestsOfKey(n.keyID) {
 				g.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
@@ -440,7 +460,9 @@ func retentionSweep() {
 	for _, q := range []string{
 		`DELETE FROM call_log WHERE ts < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
 		`DELETE FROM audit_log WHERE ts < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
-		`DELETE FROM pending_host_msgs WHERE created_at < DATE_SUB(NOW(), INTERVAL 7 DAY) LIMIT 5000`,
+		// As long as the journal: the owner's queue carries the guests' Bluetooth
+		// openings, and a week away from the server must not lose them.
+		`DELETE FROM pending_host_msgs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
 		`DELETE FROM org_requests WHERE status IN ('new','claimed') AND expires_at < DATE_SUB(NOW(), INTERVAL 30 DAY) LIMIT 5000`,
 	} {
 		for i := 0; i < 100; i++ {

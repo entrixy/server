@@ -100,10 +100,11 @@ switch ($d['action']) {
         db()->prepare('UPDATE key_invites SET creator_fp = ? WHERE parent_key_id = ? AND creator_fp = ?')
             ->execute([$device_fp, $kid, $current]);
         // The previous handset loses the key at once: its live connection is
-        // told the key is gone, and on reconnecting it is refused as bound
-        // elsewhere.
+        // dropped, and on reconnecting it is refused as bound elsewhere. Not
+        // "revoked": that answer went to the handset that moved too, and the app
+        // removed the key it had just moved.
         db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())')
-            ->execute(['key_revoked', $kid]);
+            ->execute(['key_moved', $kid]);
         jout(['ok' => 1, 'bound' => 'moved', 'device_key' => $device_pub !== null]);
 
     case 'wait':

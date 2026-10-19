@@ -5,6 +5,13 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**On by default: the device fingerprint check.** `REQUIRE_DEVICE_FP` now defaults
+to on — an owner request without the handset's fingerprint is refused once the
+access is bound. Set `REQUIRE_DEVICE_FP=0` only while phones still run an app
+older than 10.53. A key moving to another handset closes only the other
+handsets' connections (`key_moved`), notifications are delivered exactly once,
+controllers' greetings are paced, and the owner's queue is kept 30 days.
+
 **Openings and webhooks.** A refused press (controller or owner offline, rate
 limit, paused key) now reaches the guest with the object it belongs to, and is
 logged and counted only once it really went out. Status messages carry the

@@ -38,7 +38,8 @@ $GLOBALS['jwt_ttl']           = 30 * 86400;
 // A closed server: while no code is set, anyone may register a device.
 $GLOBALS['access_code']     = envv('ACCESS_CODE', '');
 // Refuse owner requests that carry no device fingerprint (apps 10.53+ always send one).
-$GLOBALS['require_device_fp'] = in_array(strtolower(envv('REQUIRE_DEVICE_FP', '')), ['1', 'true', 'yes'], true);
+// On unless switched off: a copied device secret alone must not act for the owner.
+$GLOBALS['require_device_fp'] = !in_array(strtolower(envv('REQUIRE_DEVICE_FP', '1')), ['0', 'false', 'no'], true);
 // Whose page may read this server's answers in a browser. The browser client
 // lives at entrixy.com; point this at yourself if you host a copy of it.
 $GLOBALS['app_origin']      = envv('APP_ORIGIN', 'https://entrixy.com');
