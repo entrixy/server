@@ -27,6 +27,19 @@ CREATE TABLE `audit_log` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ble_revokes` (
+  `host_id` int(11) NOT NULL,
+  `lock_did` bigint(20) NOT NULL,
+  `guest_id` int(11) NOT NULL,
+  `version` int(10) unsigned NOT NULL,
+  `revoked` tinyint(4) NOT NULL DEFAULT 1,
+  `sig` varchar(32) NOT NULL,
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`host_id`,`lock_did`,`guest_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `call_log` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `user_key_id` int(10) unsigned NOT NULL,

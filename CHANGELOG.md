@@ -5,6 +5,12 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Bluetooth locks: revoking a guest.** The worker keeps the owner's signed
+decisions about guests on their Bluetooth locks (new table `ble_revokes`,
+created by the migration) and hands them to the owner's guests, whose phones
+carry them to the lock. The server cannot forge or revive a decision: the lock
+checks the owner's signature and the version. Locks need the new firmware.
+
 **Keys passed on.** A key passed on stops with the key it came through: pausing, expiring or switching off a key now holds every key passed on below it, in the API and in the worker, and guests below see their objects switched off. An object taken out of a key now leaves every key passed on
 below it as well. A link opened later is checked against what the parent holds
 at that moment (objects, levels, "app only"), not when the link was made. A part

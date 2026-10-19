@@ -190,6 +190,10 @@ func handleMessage(c *Conn, data []byte) {
 		sockFire(c, msg)
 	case "sock_revoke":
 		sockRevoke(c, msg)
+	case "ble_revoke":
+		bleRevoke(c, msg)
+	case "ble_revokes_req":
+		bleRevokesReq(c)
 	case "device_hello":
 		deviceHello(c, msg)
 	case "device_response", "device_status":

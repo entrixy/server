@@ -595,3 +595,77 @@ func bleFireEvent(c *Conn, msg map[string]any) {
 	}
 	c.send(map[string]any{"type": "ble_fire_event_ack", "acked_ts": acked})
 }
+
+// ── Bluetooth locks: the owner's decisions about guests ─────────────────────
+//
+// The owner signs "guest N revoked (or allowed), version V" with the lock's own
+// secret. The server keeps the latest per guest and hands the records to the
+// owner's guests: any phone at the door carries them to the lock, which checks
+// the signature itself. The server can neither forge nor revive a decision —
+// an older version is ignored by the lock.
+func bleRevoke(c *Conn, msg map[string]any) {
+	if c.snapRole() != "host" {
+		return
+	}
+	hostID := c.snapHostID()
+	lockDid := num(msg, "lock_did")
+	guestID := num(msg, "guest_id")
+	version := num(msg, "version")
+	revoked := int64(1)
+	if !boolOf(msg, "revoked", true) {
+		revoked = 0
+	}
+	sig := str(msg, "sig")
+	if lockDid == 0 || guestID <= 0 || guestID > 0xFFFF || version <= 0 || len(sig) == 0 || len(sig) > 32 {
+		return
+	}
+	// A cap per owner: records are small, but a phone looping on this must not
+	// fill the table.
+	var n int
+	queryRow(`SELECT COUNT(*) FROM ble_revokes WHERE host_id = ?`, hostID).Scan(&n)
+	if n >= 2000 {
+		return
+	}
+	res, err := db.Exec(`INSERT INTO ble_revokes (host_id, lock_did, guest_id, version, revoked, sig)
+	      VALUES (?, ?, ?, ?, ?, ?)
+	      ON DUPLICATE KEY UPDATE
+	        revoked = IF(VALUES(version) > version, VALUES(revoked), revoked),
+	        sig     = IF(VALUES(version) > version, VALUES(sig), sig),
+	        version = GREATEST(version, VALUES(version))`,
+		hostID, lockDid, guestID, version, revoked, sig)
+	if err != nil {
+		return
+	}
+	// The owner sends everything again after each reconnect: guests hear only
+	// of a record that is new or newer.
+	if n, _ := res.RowsAffected(); n == 0 {
+		return
+	}
+	item := map[string]any{"lock_did": lockDid, "guest_id": guestID, "version": version,
+		"revoked": revoked, "sig": sig}
+	for _, g := range hub.guestsOfHost(hostID) {
+		g.send(map[string]any{"type": "ble_revokes", "items": []any{item}})
+	}
+}
+
+func bleRevokesReq(c *Conn) {
+	if c.snapRole() != "guest" {
+		return
+	}
+	rows, ok := query(`SELECT lock_did, guest_id, version, revoked, sig FROM ble_revokes
+	                   WHERE host_id = ? ORDER BY updated_at DESC LIMIT 500`, c.snapHostID())
+	if !ok {
+		return
+	}
+	items := []any{}
+	for rows.Next() {
+		var lockDid, guestID, version, revoked int64
+		var sig string
+		if rows.Scan(&lockDid, &guestID, &version, &revoked, &sig) == nil {
+			items = append(items, map[string]any{"lock_did": lockDid, "guest_id": guestID,
+				"version": version, "revoked": revoked, "sig": sig})
+		}
+	}
+	rows.Close()
+	c.send(map[string]any{"type": "ble_revokes", "items": items})
+}
