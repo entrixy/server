@@ -465,6 +465,11 @@ func guestHello(c *Conn, msg map[string]any) {
 	if keyMode == "" {
 		keyMode = "auto"
 	}
+	// A key passed on from a paused one shows as paused: the guest sees its
+	// objects switched off, not an error on every press.
+	if !ancestorsLive(ukID) {
+		keyMode = "off"
+	}
 	c.mu.Lock()
 	c.role = "guest"
 	c.userKeyID = ukID

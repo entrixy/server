@@ -5,7 +5,7 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
-**Keys passed on.** A key passed on stops with the key it came through: pausing, expiring or switching off a key now holds every key passed on below it, in the API and in the worker. An object taken out of a key now leaves every key passed on
+**Keys passed on.** A key passed on stops with the key it came through: pausing, expiring or switching off a key now holds every key passed on below it, in the API and in the worker, and guests below see their objects switched off. An object taken out of a key now leaves every key passed on
 below it as well. A link opened later is checked against what the parent holds
 at that moment (objects, levels, "app only"), not when the link was made. A part
 not yet bound to a handset cannot be taken over by opening the link again, and

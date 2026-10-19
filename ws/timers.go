@@ -218,17 +218,24 @@ func pumpNotifications() {
 				g.sendThenClose(map[string]any{"type": "error", "reason": "bad_key"})
 			}
 		case "key_mode_changed":
-			var mode sql.NullString
-			queryRow(`SELECT mode FROM user_keys WHERE id = ?`, n.keyID).Scan(&mode)
-			newMode := mode.String
-			if newMode == "" {
-				newMode = "auto"
-			}
-			for _, g := range hub.guestsOfKey(n.keyID) {
-				g.mu.Lock()
-				g.keyMode = newMode
-				g.mu.Unlock()
-				g.send(map[string]any{"type": "mode_update", "mode": newMode})
+			// The key and every key passed on below it: a pause above holds them
+			// all, and lifting it gives each its own mode back.
+			for _, kid := range keySubtree(n.keyID) {
+				var mode sql.NullString
+				queryRow(`SELECT mode FROM user_keys WHERE id = ?`, kid).Scan(&mode)
+				newMode := mode.String
+				if newMode == "" {
+					newMode = "auto"
+				}
+				if kid != n.keyID && !ancestorsLive(kid) {
+					newMode = "off"
+				}
+				for _, g := range hub.guestsOfKey(kid) {
+					g.mu.Lock()
+					g.keyMode = newMode
+					g.mu.Unlock()
+					g.send(map[string]any{"type": "mode_update", "mode": newMode})
+				}
 			}
 		case "message_read", "message_delivered":
 			var hostID int64
