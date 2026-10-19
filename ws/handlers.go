@@ -450,7 +450,11 @@ func guestHello(c *Conn, msg map[string]any) {
 	if bound == "" && deviceFP != "" {
 		res, err := db.Exec(`UPDATE user_keys SET bound_device_fp = ?, bound_at = NOW()
 		                     WHERE id = ? AND (bound_device_fp IS NULL OR bound_device_fp = '')`, deviceFP, ukID)
-		if n, _ := res.RowsAffected(); err == nil && n == 1 {
+		var n int64
+		if err == nil {
+			n, _ = res.RowsAffected()
+		}
+		if n == 1 {
 			bound = deviceFP
 		} else {
 			var now sql.NullString

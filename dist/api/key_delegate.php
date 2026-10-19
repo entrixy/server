@@ -175,6 +175,13 @@ if ($action === 'create') {
         $pv = db()->prepare('SELECT id FROM key_invites WHERE grp = ? AND parent_key_id = ? AND status = "new"');
         $pv->execute([$grp0, (int)$k['id']]);
         $prev = (int)$pv->fetchColumn() ?: null;
+        // A link opens with at most 16 parts (redeem refuses more): a seventeenth
+        // would make the whole link unusable for everyone.
+        if (!$prev) {
+            $pc = db()->prepare('SELECT COUNT(*) FROM key_invites WHERE grp = ? AND status IN ("new", "redeemed")');
+            $pc->execute([$grp0]);
+            if ((int)$pc->fetchColumn() >= 16) jout(['error' => 'too_many_parts'], 400);
+        }
     }
     $sets = pass_objects($k, $j, null, $prev);
     if (!$sets) {

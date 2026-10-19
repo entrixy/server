@@ -603,6 +603,7 @@ func ancestorsLive(userKeyID int64) bool {
 // keySubtree: the key and every key passed on below it, nearest first.
 func keySubtree(root int64) []int64 {
 	out := []int64{root}
+	seen := map[int64]bool{root: true}
 	for i := 0; i < len(out) && len(out) < 1000; i++ {
 		rows, ok := query(`SELECT id FROM user_keys WHERE parent_key_id = ?`, out[i])
 		if !ok {
@@ -610,7 +611,8 @@ func keySubtree(root int64) []int64 {
 		}
 		for rows.Next() {
 			var id int64
-			if rows.Scan(&id) == nil {
+			if rows.Scan(&id) == nil && !seen[id] {
+				seen[id] = true
 				out = append(out, id)
 			}
 		}

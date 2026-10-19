@@ -227,7 +227,7 @@ func pumpNotifications() {
 				if newMode == "" {
 					newMode = "auto"
 				}
-				if kid != n.keyID && !ancestorsLive(kid) {
+				if !ancestorsLive(kid) {
 					newMode = "off"
 				}
 				for _, g := range hub.guestsOfKey(kid) {

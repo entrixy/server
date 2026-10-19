@@ -75,15 +75,21 @@ require __DIR__ . '/partials/head.php';
     <script <?= csp_nonce_attr() ?>>
       // The key to the first message lives after # and never reaches the server;
       // the app needs it, so it goes along.
-      (function(){var h=location.hash.slice(1),a=document.getElementById('og-open');
+      // Kept in the tab's session too: the address loses it below, and a reload
+      // after installing the app would send the key on without it for good.
+      (function(){var c=<?= json_encode((string)$code) ?>,h=location.hash.slice(1),a=document.getElementById('og-open');
+        try{if(h)sessionStorage.setItem('og_w_'+c,h);else h=sessionStorage.getItem('og_w_'+c)||'';}catch(e){}
         if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;})();
     </script>
     <a class="og-btn ghost" href="https://entrixy.com/download/android">Install the app</a>
     <a class="og-btn ghost" id="og-web" href="https://entrixy.com/app/#i=<?= rawurlencode($code) ?>&amp;h=<?= rawurlencode(site_host()) ?>">Open in the browser</a>
     <script <?= csp_nonce_attr() ?>>
       // Браузер принимает ключ сам; ключ к первому сообщению — из якоря.
-      (function(){var h=location.hash.slice(1),a=document.getElementById('og-web');
+      (function(){var c=<?= json_encode((string)$code) ?>,h=location.hash.slice(1),a=document.getElementById('og-web');
+        var fromHash=!!h;
+        try{if(!h)h=sessionStorage.getItem('og_w_'+c)||'';}catch(e){}
         if(h&&/^[A-Za-z0-9_-]+$/.test(h))a.href+='&w='+h;
+        h=fromHash;
         // Taken into both buttons — out of the address, so it stays out of history.
         if(h)try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}})();
     </script>

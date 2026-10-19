@@ -621,9 +621,12 @@ func bleRevoke(c *Conn, msg map[string]any) {
 	}
 	// A cap per owner: records are small, but a phone looping on this must not
 	// fill the table.
-	var n int
+	// A record already stored can always be updated (allowing a guest back).
+	var n, have int
 	queryRow(`SELECT COUNT(*) FROM ble_revokes WHERE host_id = ?`, hostID).Scan(&n)
-	if n >= 2000 {
+	queryRow(`SELECT COUNT(*) FROM ble_revokes WHERE host_id = ? AND lock_did = ? AND guest_id = ?`,
+		hostID, lockDid, guestID).Scan(&have)
+	if n >= 2000 && have == 0 {
 		return
 	}
 	res, err := db.Exec(`INSERT INTO ble_revokes (host_id, lock_did, guest_id, version, revoked, sig)

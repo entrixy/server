@@ -80,6 +80,12 @@ func (c *Conn) sendRaw(b []byte) { c.trySend(b) }
 // sendWait queues a frame, waiting up to d for room: a stored queue handed
 // over on a slow link must not overflow and drop the connection.
 func (c *Conn) sendWait(b []byte, d time.Duration) bool {
+	// Closed already: say so first. With room in the buffer select would pick
+	// between the two ready cases at random and report half the frames as sent
+	// into a connection that is gone.
+	if c.isClosed() {
+		return false
+	}
 	t := time.NewTimer(d)
 	defer t.Stop()
 	select {
@@ -94,6 +100,9 @@ func (c *Conn) sendWait(b []byte, d time.Duration) bool {
 
 // trySend reports whether the frame was queued.
 func (c *Conn) trySend(b []byte) bool {
+	if c.isClosed() {
+		return false
+	}
 	select {
 	case c.out <- b:
 		return true
@@ -113,12 +122,21 @@ func (c *Conn) trySend(b []byte) bool {
 // this: an "evicted" that never arrives leaves the old handset thinking it is
 // still the owner.
 func (c *Conn) sendThenClose(v any) {
+	c.send(v)                // the last frame first: closing below stops every later one
 	c.closing.Store(true)
-	c.send(v)
 	go func() {
 		time.Sleep(300 * time.Millisecond)
 		c.close()
 	}()
+}
+
+func (c *Conn) isClosed() bool {
+	select {
+	case <-c.closed:
+		return true
+	default:
+		return c.closing.Load()
+	}
 }
 
 func (c *Conn) close() {
@@ -210,16 +228,24 @@ func newHub() *Hub {
 	}
 }
 
+// A connection being closed is not the owner's any more: until its read loop
+// ends it still sits in the map, and an opening handed to it would be lost.
 func (h *Hub) host(id int64) *Conn {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.hosts[id]
+	if c := h.hosts[id]; c != nil && !c.isClosed() {
+		return c
+	}
+	return nil
 }
 
 func (h *Hub) device(id int64) *Conn {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	return h.devices[id]
+	if c := h.devices[id]; c != nil && !c.isClosed() {
+		return c
+	}
+	return nil
 }
 
 func (h *Hub) guest(id int64) *Conn {
