@@ -25,6 +25,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 [ "$(id -u)" = 0 ] || { say "Run this as root: sudo sh tools/install-native.sh"; exit 1; }
 [ -d "$dist" ] || { say "dist/ is missing — run this from the unpacked distribution."; exit 1; }
+have php || { say "PHP (CLI, 7.4 or newer) is needed: install php-cli, php-fpm, php-mysql, php-sodium first."; exit 1; }
 
 say "Entrixy, installation without Docker."
 say ""
@@ -76,8 +77,8 @@ else
         echo "\$GLOBALS[\"app_attest_secret\"] = " . $v("E_ATT") . ";\n";
         echo "\$GLOBALS[\"access_code\"] = \"\";\n";
         echo "\$GLOBALS[\"ws_host\"] = \"127.0.0.1\";\n\$GLOBALS[\"ws_port\"] = 8095;\n";
-    ' > "$local_cfg"
-    php -l "$local_cfg" >/dev/null || { say "   Could not write $local_cfg correctly"; exit 1; }
+    ' > "$local_cfg.tmp" && php -l "$local_cfg.tmp" >/dev/null && mv "$local_cfg.tmp" "$local_cfg" \
+        || { rm -f "$local_cfg.tmp"; say "   Could not write $local_cfg (PHP 7.4+ CLI is needed)"; exit 1; }
     chmod 600 "$local_cfg"
     chown "$(stat -c '%U' "$dist")" "$local_cfg" 2>/dev/null || true
     say "1. Settings written to $local_cfg, secrets generated."

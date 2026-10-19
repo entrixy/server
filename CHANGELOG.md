@@ -9,11 +9,13 @@ and what matters is what a running one has to do to catch up.
 up or expire; only revoking every invitation opens it, and a database error no
 longer opens it. The backup command in the README now produces a usable dump
 (with a restore command). A migration that fails on one change goes on with the
-rest and says so. The server refuses to start on the example `JWT_SECRET` or
-`DB_PASS`. `REQUIRE_DEVICE_FP` in `.env`. The installer without Docker writes
+rest and says so. The server refuses to start on the example or a short
+`JWT_SECRET`. `REQUIRE_DEVICE_FP` in `.env`. The installer without Docker writes
 settings safely for any password, and `nginx-entrixy-native.conf.example` is a
 working nginx + PHP-FPM sample. The archive now carries `LICENSE` and
-`.gitignore`.
+`.gitignore`. The native installer checks for PHP and checks the settings file
+before putting it in place; the native nginx sample passes the site language
+and hides service scripts.
 
 **Openings are not lost and journals do not pile up.** An opening queued for an
 owner whose phone is reconnecting waits up to 30 seconds instead of being

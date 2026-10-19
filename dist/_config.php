@@ -56,15 +56,18 @@ if (is_file(__DIR__ . '/_config.local.php')) {
 }
 
 // A secret copied from the example is public: anyone could sign tokens with it.
+// (The database password is not checked: in the Docker stack the database sits
+// on the internal network only, and installations have long run with the
+// example value.)
 if ($GLOBALS['jwt_secret'] === '' || strlen($GLOBALS['jwt_secret']) < 32
     || stripos($GLOBALS['jwt_secret'], 'CHANGE_ME') !== false) {
+    $msg = 'JWT_SECRET is not set or still the example value: put 32+ random characters in .env '
+         . '(openssl rand -hex 32), or in _config.local.php when running without Docker.';
+    // From the command line (installer, worker config): to stderr and a failing
+    // status, so the text is never taken for data.
+    if (PHP_SAPI === 'cli') { fwrite(STDERR, $msg . "\n"); exit(1); }
     http_response_code(500);
-    exit('JWT_SECRET is not set or still the example value: put 32+ random characters in .env '
-       . '(openssl rand -hex 32), or in _config.local.php when running without Docker.');
-}
-if (stripos((string)($GLOBALS['db']['pass'] ?? ''), 'CHANGE_ME') !== false) {
-    http_response_code(500);
-    exit('DB_PASS is still the example value: set a real password in .env.');
+    exit($msg);
 }
 
 require __DIR__ . '/_config_functions.php';

@@ -2,6 +2,12 @@
 # nginx does not read .htaccess, so the routes and the denials live here.
 # Replace your.server, the paths and the PHP-FPM socket with your own.
 
+# The language prefix of a clean address (/ru/key → ?__lang=ru), passed to PHP.
+map $arg___lang $entrixy_lang {
+    ~^(ru|de|es|fr|pt|zh)$ $arg___lang;
+    default "";
+}
+
 server {
     listen 443 ssl;
     http2 on;
@@ -21,7 +27,7 @@ server {
     # Nothing private is served: settings, libraries, logs, dumps, hidden files.
     location ~ /\.(?!well-known/)            { deny all; }
     location ~ ^/(lib|sql|mail|vendor)/      { deny all; }
-    location ~ ^/_[^/]*\.php$                { deny all; }
+    location ~ (^|/)_[^/]*\.php$             { deny all; }
     location ~ \.(log|sql|tsv|ini|bak|sh|env|lock|md)$ { deny all; }
 
     # The live connection goes to the worker.
@@ -49,10 +55,8 @@ server {
         try_files $uri =404;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        # The language of the address, as Apache's SITELANG.
-        set $sitelang "";
-        if ($arg___lang ~ ^(ru|de|es|fr|pt|zh)$) { set $sitelang $arg___lang; }
-        fastcgi_param SITELANG $sitelang;
+        # The language of the address, as Apache's SITELANG (map at the top).
+        fastcgi_param SITELANG $entrixy_lang;
         fastcgi_pass unix:/run/php/php8.3-fpm.sock;
     }
 
