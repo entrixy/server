@@ -298,6 +298,15 @@ if ($action === 'redeem') {
     $fp = (string)($j['device_fp'] ?? '');
     $parts_in = is_array($j['parts'] ?? null) ? $j['parts'] : [];
     if ($grp === '' || !$parts_in) jout(['error' => 'bad_input'], 400);
+    // A link holds a part per owner — a handful. Thousands of parts in one
+    // request would fill the owners' queues under one lock.
+    if (count($parts_in) > 16) jout(['error' => 'too_many_parts'], 400);
+    $seen = [];
+    foreach ($parts_in as $p) {
+        $cd = is_array($p) ? (string)($p['code'] ?? '') : '';
+        if ($cd === '' || isset($seen[$cd])) jout(['error' => 'bad_input'], 400);
+        $seen[$cd] = true;
+    }
     if (!preg_match('/^[A-Za-z0-9_-]{40,200}$/', $guest_pub)) jout(['error' => 'bad_pubkey'], 400);   // a P-256 public half is 122 characters
     require_once __DIR__ . '/../lib/suites.php';
     $suite = (string)($j['suite'] ?? ENTRIXY_SUITE_PREFERRED);
@@ -338,7 +347,10 @@ if ($action === 'redeem') {
             $c->execute([(int)$inv['child_key_id']]);
             $child = $c->fetch(PDO::FETCH_ASSOC);
             if (!$child) { $out[] = ['code' => $code, 'error' => 'not_found']; continue; }
-            if ($child['bound_device_fp'] && ($fp === '' || !hash_equals($child['bound_device_fp'], $fp))) {
+            // Not bound to a handset yet: nobody can show it is theirs, and taking
+            // it over would kill the key of whoever opened the link first.
+            if (!$child['bound_device_fp']) { $out[] = ['code' => $code, 'error' => 'already_redeemed']; continue; }
+            if ($fp === '' || !hash_equals($child['bound_device_fp'], $fp)) {
                 $out[] = ['code' => $code, 'error' => 'already_bound']; continue;
             }
             db()->prepare(
@@ -364,11 +376,17 @@ if ($action === 'redeem') {
         }
         // Settings of each object as the holder chose them. The chain may have
         // run out of keys since the link was made: such objects drop out.
+        // Checked against what the parent holds now, not when the link was made:
+        // the object may have left the parent, its levels may be fewer, and
+        // "app only" is copied from the parent as it is today.
         $sets = [];
+        $pobj = key_obj_read((int)$inv['parent_key_id']);
         foreach ((array)json_decode((string)$inv['objects'], true) as $o) {
             $id = (int)($o['id'] ?? 0);
-            if ($id > 0 && key_pool_left((int)$inv['parent_key_id'], $id, null, (int)$inv['id']) >= 1) {
-                $sets[$id] = ['n' => (int)$o['n'], 'd' => (int)$o['d'], 'p' => (int)$o['p']];
+            $po = $pobj[$id] ?? null;
+            if ($id <= 0 || !$po || $po['d'] < 1) continue;
+            if (key_pool_left((int)$inv['parent_key_id'], $id, null, (int)$inv['id']) >= 1) {
+                $sets[$id] = ['n' => $po['n'], 'd' => max(0, min((int)$o['d'], $po['d'] - 1)), 'p' => (int)$o['p']];
             }
         }
         if (!$sets) { $out[] = ['code' => $code, 'error' => 'pool_exhausted']; continue; }
@@ -535,9 +553,12 @@ if ($action === 'edit') {
     if (!$sets) {
         jout(['ok' => 1, 'revoked' => key_revoke_tree((int)$c['id'])]);
     }
+    db()->beginTransaction();
     key_obj_write((int)$c['id'], $sets);
-    // Tighter settings for the recipient take effect below them at once.
-    key_obj_enforce((int)$c['id']);
+    // Tighter settings for the recipient take effect below them at once, and
+    // objects taken out leave everyone they passed the key on to.
+    key_obj_enforce((int)$c['id'], array_diff(array_keys($cur), array_keys($sets)));
+    db()->commit();
     // The current bundle stays in place: the recipient keeps opening what was
     // confirmed until the owner assembles the new one.
     db()->prepare('UPDATE user_keys SET bundle_dirty = 1 WHERE id = ?')->execute([(int)$c['id']]);

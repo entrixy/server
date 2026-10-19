@@ -324,7 +324,9 @@ func guestHello(c *Conn, msg map[string]any) {
 	var tsN int64
 	fmt.Sscan(ts, &tsN)
 	if tsN <= 0 || abs64(time.Now().Unix()-tsN) > 300 {
-		c.close()
+		// Said, not just closed: otherwise the guest retries forever without
+		// knowing its clock is off.
+		c.sendThenClose(map[string]any{"type": "error", "reason": "clock"})
 		return
 	}
 	if !reNonce.MatchString(nonce) {

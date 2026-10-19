@@ -226,7 +226,7 @@ if ($action === 'objects') {
          FROM key_numbers kn
          JOIN numbers n ON n.id = kn.number_id
          JOIN user_keys uk ON uk.id = kn.user_key_id
-         WHERE kn.user_key_id = ? AND uk.org_id = ? AND uk.enabled = 1'
+         WHERE kn.user_key_id = ? AND uk.org_id = ? AND uk.enabled = 1 AND COALESCE(uk.mode, \'auto\') <> \'off\''
     );
     $st->execute([$key_ref, $o['id']]);
     $rows = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -276,9 +276,9 @@ if ($action === 'open') {
     if (!$k) {
         // There is no key at all: the client removed the company on their side. For
         // the service that is a revocation, not a bad request.
-        $gone = db()->prepare('SELECT id FROM user_keys WHERE id = ?');
-        $gone->execute([$key_ref]);
-        jout(['error' => $gone->fetchColumn() ? 'forbidden' : 'revoked'], 403);
+        // One answer whether the key is another company's or gone: telling them
+        // apart would let a company find out which key numbers exist.
+        jout(['error' => 'revoked'], 403);
     }
     if ((int)$k['enabled'] !== 1 || ($k['mode'] ?? 'auto') === 'off') jout(['error' => 'revoked'], 403);
     if ($k['expires_at'] && strtotime($k['expires_at']) < time()) jout(['error' => 'expired'], 403);

@@ -37,6 +37,7 @@ return [
     '.
         Do you manufacture hardware?' => '.
         Stellen Sie Technik her?',
+    'done' => 'fertig',
     'app' => 'App',
     'server' => 'Server',
     'The request' => 'Die Anfrage',
@@ -101,6 +102,7 @@ Content-Type: application/json
     'without' => 'ohne',
     'with' => 'mit',
     'every' => 'alle',
+    'rejects' => 'weist',
     'With' => 'Mit',
     'instead of' => 'statt',
     'Who' => 'Wer',

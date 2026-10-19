@@ -141,7 +141,7 @@ function key_pool_left(int $keyId, int $numberId, ?int $skipChild = null, ?int $
  * waits for its owner to assemble the bundle anew.
  * Returns the ids of keys revoked.
  */
-function key_obj_enforce(int $keyId): array {
+function key_obj_enforce(int $keyId, array $removed = []): array {
     require_once __DIR__ . '/key_tree.php';
     $revoked = [];
     $touched = [];
@@ -162,6 +162,16 @@ function key_obj_enforce(int $keyId): array {
         $kids->execute([$k]);
         foreach ($kids->fetchAll(PDO::FETCH_COLUMN) as $c) $strip((int)$c, $nid);
     };
+
+    // Objects taken out of this key: the loop below walks only the objects it
+    // still has, so without this they stayed with every key passed on below.
+    foreach ($removed as $nid) {
+        $nid = (int)$nid;
+        db()->prepare('UPDATE key_invites SET status = "cancelled" WHERE parent_key_id = ? AND status = "new"
+                         AND FIND_IN_SET(?, CONCAT(number_ids, ",", ble_ids))')->execute([$keyId, $nid]);
+        $kids->execute([$keyId]);
+        foreach ($kids->fetchAll(PDO::FETCH_COLUMN) as $c) $strip((int)$c, $nid);
+    }
 
     foreach (key_obj_read($keyId) as $nid => $s) {
         // Levels: walk the branch level by level; below the allowed depth the

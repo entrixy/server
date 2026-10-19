@@ -239,16 +239,20 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
   // explains Play Protect and the steps, rather than at the raw file.
   function downloadApk() {
     var url = KEY_URL;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url);
-      else {
+    // The browser may refuse the clipboard (the promise rejects, nothing
+    // throws): then the old way, and the note only once the copy happened.
+    function fallback() {
+      try {
         var ta = document.createElement('textarea');
         ta.value = url; document.body.appendChild(ta); ta.select();
-        document.execCommand('copy'); ta.remove();
-      }
-    } catch (e) {}
-    $('hint').textContent = t.copied;
-    $('hint').hidden = false;
+        var ok = document.execCommand('copy'); ta.remove();
+        return ok;
+      } catch (e) { return false; }
+    }
+    function done(ok) { if (ok) { $('hint').textContent = t.copied; $('hint').hidden = false; } }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(fallback()); });
+    } else done(fallback());
     // Only we distribute the app: another server has no download page, and a
     // tampered client is the worst thing this page guards against. An owner of
     // their own server can change the address here at their own risk.
@@ -271,8 +275,10 @@ a.home{display:inline-block;margin-top:18px;color:#667085;font-size:13px;text-de
     acts.appendChild(mkBtn(t.use_web, 'btn-primary', function () { saveKey(); location.href = webAppUrl(); }));
     acts.appendChild(mkBtn(t.install_pwa, 'btn-second', function () {
       saveKey();
+      // No install offer here (the manifest belongs to /app/): the client
+      // carries on with the installation there.
       if (deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.then(function () { location.href = webAppUrl(); }); }
-      else { location.href = webAppUrl(); }
+      else { location.href = webAppUrl() + '&install=1'; }
     }));
     if (isAndroid) {
       acts.appendChild(mkBtn(t.install_app, 'btn-second', downloadApk));

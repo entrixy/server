@@ -37,6 +37,7 @@ return [
     '.
         Do you manufacture hardware?' => '.
         Производите оборудование?',
+    'done' => 'готово',
     'app' => 'приложение',
     'server' => 'сервер',
     'The request' => 'Запрос',
@@ -101,6 +102,7 @@ Content-Type: application/json
     'without' => 'без',
     'with' => 'с',
     'every' => 'каждые',
+    'rejects' => 'отвергает',
     'With' => 'При',
     'instead of' => 'вместо',
     'Who' => 'Кто',

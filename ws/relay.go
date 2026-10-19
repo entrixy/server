@@ -480,6 +480,13 @@ func avatarRequest(c *Conn, msg map[string]any) {
 	if numberID == 0 {
 		return
 	}
+	// Only an object in this guest's key: otherwise any guest could keep the
+	// owner's phone busy sending pictures of everything it has.
+	var one int
+	if queryRow(`SELECT 1 FROM key_numbers WHERE user_key_id = ? AND number_id = ?`,
+		c.snapUserKeyID(), numberID).Scan(&one) != nil {
+		return
+	}
 	h := hub.host(c.snapHostID())
 	if h == nil {
 		c.send(map[string]any{"type": "avatar_data", "number_id": numberID, "data": nil})

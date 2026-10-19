@@ -23,6 +23,17 @@ if (array_key_exists('bundle_cipher_ts_check', $j) && array_key_exists('bundle_c
     }
 }
 
+// Checked before anything is written: a refusal after the objects changed
+// would leave the owner thinking nothing happened.
+if (array_key_exists('bundle_cipher', $j)) {
+    $b0 = (string)$j['bundle_cipher'];
+    if ($b0 !== '' && !is_valid_cipher($b0)) jout(['error' => 'invalid_cipher_format'], 400);
+}
+if (array_key_exists('key_cipher', $j)) {
+    $kc0 = (string)$j['key_cipher'];
+    if ($kc0 !== '' && !preg_match('/^[A-Za-z0-9_.:-]{1,255}$/', $kc0)) jout(['error' => 'bad_key_cipher'], 400);
+}
+
 // Bluetooth locks sit in the same list. A call that does not mention them
 // (most rebuilds of a bundle) leaves them as they are.
 $cur = key_obj_read($id);
@@ -68,10 +79,15 @@ foreach ($valid as $nid) {
     else $settings[$nid] = $row['org_id'] !== null ? ['n' => 0, 'd' => 0, 'p' => 1] : KEY_OBJ_DEFAULTS;
     if (!isset($org_labels[$nid]) && isset($cur[$nid]['org_label'])) $org_labels[$nid] = $cur[$nid]['org_label'];
 }
+// Objects and everything below them change as one: a failure halfway would
+// leave keys passed on with objects their parent no longer has.
+db()->beginTransaction();
+try {
 key_obj_write($id, $settings, $org_labels);
 // Tighter settings take effect below at once: keys passed on beyond the new
-// limits lose the object, the newest first.
-$cut = key_obj_enforce($id);
+// limits lose the object, the newest first; an object taken out of this key
+// leaves every key passed on below it.
+$cut = key_obj_enforce($id, array_diff(array_keys($cur), $valid));
 
 if (isset($j['force_when_busy'])) {
     db()->prepare('UPDATE user_keys SET force_when_busy = ? WHERE id = ?')
@@ -103,6 +119,11 @@ if (array_key_exists('key_cipher', $j)) {
 db()->prepare(
     'INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())'
 )->execute(['key_updated', $id]);
+db()->commit();
+} catch (\Throwable $e) {
+    if (db()->inTransaction()) db()->rollBack();
+    throw $e;
+}
 
 audit_log($host_id, 'key_edit', 'user_key', $id, [
     'numbers' => $valid,

@@ -37,6 +37,7 @@ return [
     '.
         Do you manufacture hardware?' => '.
         Fabrica equipamento?',
+    'done' => 'feito',
     'app' => 'aplicação',
     'server' => 'servidor',
     'The request' => 'O pedido',
@@ -101,6 +102,7 @@ Content-Type: application/json
     'without' => 'sem',
     'with' => 'com',
     'every' => 'a cada',
+    'rejects' => 'rejeita',
     'With' => 'Com',
     'instead of' => 'em vez de',
     'Who' => 'Quem',

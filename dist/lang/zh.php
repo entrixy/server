@@ -37,6 +37,7 @@ return [
     '.
         Do you manufacture hardware?' => '。
         您是硬件制造商吗？',
+    'done' => '已完成',
     'app' => '应用',
     'server' => '服务器',
     'The request' => '请求',
@@ -101,6 +102,7 @@ Content-Type: application/json
     'without' => '（不带',
     'with' => '，带',
     'every' => '），每隔',
+    'rejects' => '拒绝',
     'With' => '使用',
     'instead of' => '而不是',
     'Who' => '谁',
