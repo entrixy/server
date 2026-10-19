@@ -20,6 +20,9 @@ $st = db()->prepare(
      FROM user_keys uk
      JOIN key_numbers kn ON kn.user_key_id = uk.id
      WHERE uk.id = ? AND uk.enabled = 1 AND kn.number_id = ?
+       AND COALESCE(uk.mode, "auto") <> "off"
+       -- A key settled on a handset opens only with the pair of that handset.
+       AND (uk.bound_device_fp IS NULL OR uk.sign_pub_device IS NOT NULL)
        AND uk.org_id IS NULL
        -- An "app only" object opens only through the live connection of the app,
        -- which proves it is the app; this plain request cannot.

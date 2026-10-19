@@ -51,6 +51,7 @@ $st->execute([(int)$who['id']]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'not_found'], 404);
 if (!(int)$row['enabled']) jout(['error' => 'disabled'], 403);
+if (!guest_key_live((int)$row['id'])) jout(['error' => 'disabled'], 403);
 
 $current = $row['bound_device_fp'] ?? null;
 $kid = (int)$row['id'];
@@ -87,6 +88,9 @@ switch ($d['action']) {
         // issues them a key of their own. Letting the second device take over
         // would mean a copy of the link is enough to walk in.
         if (!$want_move) jout(['error' => 'already_bound'], 403);
+        // Без пары нового аппарата переезд вернул бы в силу пару из ссылки:
+        // любая копия ссылки снова открывала бы.
+        if ($device_pub === null) jout(['error' => 'device_key_required'], 400);
         device_move_apply('user_keys', $kid, $device_fp, $current);
         db()->prepare('UPDATE user_keys SET sign_pub_device = ? WHERE id = ?')->execute([$device_pub, $kid]);
         // Links this key passed on were made from the previous handset; the

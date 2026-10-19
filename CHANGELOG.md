@@ -5,6 +5,16 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**An owner's access moves only by an explicit claim.** A request with another
+device's fingerprint is refused (`wrong_device`) instead of moving the access
+silently; moving is `host_claim.php` alone. Set `$GLOBALS['require_device_fp'] = true`
+to refuse owner requests without a fingerprint once your clients are 10.53+.
+Guest endpoints share one rule for a live key (enabled, not switched off, not
+expired): `key_bundle`, `key_bind`, `guest_call`; a key moved to a new handset
+needs that handset's key (`device_key_required`). A company request is closed
+only by the phone that opened it. `MOVE_COOLDOWN` is defined again (a comment
+was left open): a second move no longer fails. App 10.53.
+
 **A greeting refused for the right reason.** The worker tells a missing key
 (`bad_key`) from a database error (`server_error`) and a repeated greeting
 (`replay`), so a client does not forget a key over a hiccup. App 10.52.

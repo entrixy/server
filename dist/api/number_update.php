@@ -7,7 +7,7 @@ $id = (int)($j['id'] ?? 0);
 if (!$id) jout(['error' => 'bad_input'], 400);
 
 // Check that the object belongs to this host
-$st = db()->prepare('SELECT id, UNIX_TIMESTAMP(data_cipher_updated) AS dct FROM numbers WHERE id = ? AND host_id = ?');
+$st = db()->prepare('SELECT id, type, UNIX_TIMESTAMP(data_cipher_updated) AS dct FROM numbers WHERE id = ? AND host_id = ?');
 $st->execute([$id, $host_id]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 if (!$row) jout(['error' => 'forbidden'], 403);
@@ -43,9 +43,14 @@ if (array_key_exists('data_cipher', $j) && !is_valid_cipher($j['data_cipher'])) 
     jout(['error' => 'invalid_cipher_format'], 400);
 }
 
+// Webhook settings belong to a webhook object only.
+if (($row['type'] ?? '') !== 'webhook') {
+    unset($j['webhook_url'], $j['webhook_secret'], $j['webhook_mode']);
+}
 // SSRF: the same filter of internal addresses as when a webhook object is created.
 if (array_key_exists('webhook_url', $j)) {
     $wu = trim((string)$j['webhook_url']);
+    if ($wu !== '' && !preg_match('#^https?://#i', $wu)) jout(['error' => 'webhook_url_forbidden'], 400);
     if ($wu !== '' && ssrf_host_blocked(parse_url($wu, PHP_URL_HOST))) {
         jout(['error' => 'webhook_url_forbidden'], 400);
     }

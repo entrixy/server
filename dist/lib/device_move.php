@@ -13,6 +13,7 @@
  * Why the limit: a copy of the keys travels as a file, and without a delay it
  * could be passed around in a circle. With one, passing it around becomes
  * noticeable.
+ */
 
 const MOVE_COOLDOWN = 24 * 3600;       // a day between moves
 

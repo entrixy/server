@@ -101,3 +101,13 @@ function guest_auth(array $j, string $endpoint, string $rawBody, ?string &$via =
 
     return null;                          // no signature — not recognised
 }
+
+/** The key works right now: enabled, not switched off by the owner, not expired.
+ *  One rule for every guest endpoint, the same the websocket worker applies. */
+function guest_key_live(int $keyId): bool {
+    $st = db()->prepare("SELECT 1 FROM user_keys WHERE id = ? AND enabled = 1
+                         AND COALESCE(mode, 'auto') <> 'off'
+                         AND (expires_at IS NULL OR expires_at > NOW())");
+    $st->execute([$keyId]);
+    return (bool)$st->fetchColumn();
+}

@@ -89,9 +89,10 @@ if ($org_code !== '') {
     $st = db()->prepare(
         'SELECT r.id, r.org_id, r.status, r.expires_at
          FROM org_requests r JOIN orgs o ON o.id = r.org_id
-         WHERE r.code = ? AND o.status <> "blocked"'
+         WHERE r.code = ? AND o.status <> "blocked"
+           AND (r.host_id IS NULL OR r.host_id = ?)'   // закрывает тот телефон, что открыл обращение
     );
-    $st->execute([$org_code]);
+    $st->execute([$org_code, $host_id]);
     $org_request = $st->fetch(PDO::FETCH_ASSOC);
     if (!$org_request) jout(['error' => 'org_request_not_found'], 404);
     if (!in_array($org_request['status'], ['new', 'claimed'], true)) {

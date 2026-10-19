@@ -134,15 +134,19 @@ function host_auth() {
         if ($d['action'] === 'bind') {
             device_move_bind('hosts', (int)$row['id'], $fp);
             $row['bound_device_fp'] = $fp;          // otherwise the check below would see the old one
-        } elseif ($d['action'] === 'move') {
-            device_move_apply('hosts', (int)$row['id'], $fp, $cur);
-            $row['bound_device_fp'] = $fp;
-        } elseif ($d['action'] === 'wait') {
-            jout(['error' => 'move_too_soon', 'retry_after' => $d['retry_after']], 429);
         } elseif ($d['action'] === 'evicted') {
             jout(['error' => 'evicted'], 409);
+        } elseif ($d['action'] !== 'same') {
+            // Чужой аппарат. Переезд — только явной заявкой (host_claim.php), с
+            // согласия человека на новом телефоне; обычный запрос доступ не
+            // переносит, иначе телефон с копией перехватывал бы его молча.
+            jout(['error' => 'wrong_device'], 409);
         }
-    } elseif (!empty($row['bound_device_fp']) && $fp !== '') {
+    } elseif (!empty($row['bound_device_fp']) && ($fp !== '' || !empty($GLOBALS['require_device_fp']))) {
+        // Доступ закреплён за аппаратом, а запрос без отпечатка (или с битым):
+        // так входил бы старый телефон или копия секрета — отказ. Пустой отпечаток
+        // отклоняется, когда включено require_device_fp: приложение с 10.53 шлёт
+        // его в каждом запросе.
         jout(['error' => 'bad_fp'], 400);
     }
 

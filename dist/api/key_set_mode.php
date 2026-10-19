@@ -11,6 +11,12 @@ if (!in_array($mode, ['off', 'auto', 'notify', 'confirm'], true)) {
 
 $st = db()->prepare('UPDATE user_keys SET mode = ? WHERE id = ? AND host_id = ?');
 $st->execute([$mode, $id, $host_id]);
+// Не свой ключ — ни уведомления, ни записи в журнал.
+if ($st->rowCount() === 0) {
+    $own = db()->prepare('SELECT 1 FROM user_keys WHERE id = ? AND host_id = ?');
+    $own->execute([$id, $host_id]);
+    if (!$own->fetchColumn()) jout(['error' => 'not_found'], 404);
+}
 
 db()->prepare(
     'INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())'

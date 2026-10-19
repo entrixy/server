@@ -9,7 +9,7 @@ $device_id = (string)($j['device_id'] ?? '');
 $device_secret = (string)($j['device_secret'] ?? '');
 if (!$who) jout(['valid' => 0, 'is_own' => 0]);
 
-$st = db()->prepare('SELECT host_id, enabled FROM user_keys WHERE id = ? LIMIT 1');
+$st = db()->prepare('SELECT host_id, enabled, expires_at FROM user_keys WHERE id = ? LIMIT 1');
 $st->execute([(int)$who['id']]);
 $row = $st->fetch(PDO::FETCH_ASSOC);
 
@@ -32,7 +32,8 @@ if ($row) {
 }
 
 jout([
-    'valid'       => ($row && $row['enabled']) ? 1 : 0,
+    // Истёкший ключ уже не вернётся; выключенный владельцем — вернётся, он «жив».
+    'valid'       => ($row && $row['enabled'] && (empty($row['expires_at']) || strtotime($row['expires_at']) > time())) ? 1 : 0,
     'is_own'      => $isOwn,
     'host_active' => $hostActive,
 ]);
