@@ -19,6 +19,7 @@ $st = db()->prepare(
     'SELECT uk.id AS user_key_id, uk.host_id
      FROM user_keys uk
      JOIN key_numbers kn ON kn.user_key_id = uk.id
+     JOIN numbers n ON n.id = kn.number_id AND n.type = "call"
      WHERE uk.id = ? AND uk.enabled = 1 AND kn.number_id = ?
        AND COALESCE(uk.mode, "auto") <> "off"
        -- A key settled on a handset opens only with the pair of that handset.

@@ -34,6 +34,11 @@ $webhook_secret = ($type === 'webhook' && $webhook_mode === 'server') ? trim((st
 if ($webhook_url !== null && $webhook_url !== '' && ssrf_host_blocked(parse_url($webhook_url, PHP_URL_HOST))) {
     jout(['error' => 'webhook_url_forbidden'], 400);
 }
+// Every request goes out signed: a server webhook without a secret would be an
+// unsigned "open" anyone could repeat.
+if ($webhook_url !== null && $webhook_url !== '' && ($webhook_secret === null || $webhook_secret === '')) {
+    jout(['error' => 'webhook_secret_required'], 400);
+}
 
 $device_id = $type === 'device' ? (int)($j['device_id_ref'] ?? 0) : null;
 if ($device_id === 0) $device_id = null;

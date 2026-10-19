@@ -157,17 +157,29 @@ func fireWebhook(j webhookJob) {
 		switch level {
 		case "success", "warning", "danger", "info":
 		default:
-			if s, _ := result["status"].(string); s == "ok" {
+			// Neither {level} nor {status}: the HTTP code decides — a plain 200, as
+			// the description promises, is a success.
+			s, _ := result["status"].(string)
+			switch {
+			case s == "ok":
 				level = "success"
-			} else {
+			case s == "error":
+				level = "danger"
+			case resp.StatusCode >= 200 && resp.StatusCode < 300:
+				level = "success"
+			default:
 				level = "danger"
 			}
 		}
 		message, _ := result["message"].(string)
 		if message == "" {
-			message = string(raw)
-			if message == "" {
-				message = "no response"
+			// The raw body is not shown: it goes to the guest too.
+			if level == "success" {
+				message = "OK"
+			} else if len(raw) == 0 {
+				message = fmt.Sprintf("HTTP %d, no response", resp.StatusCode)
+			} else {
+				message = fmt.Sprintf("HTTP %d", resp.StatusCode)
 			}
 		}
 		whlog("call=%s result level=%s msg=%.120s", j.CallID, level, message)
@@ -208,7 +220,8 @@ func (j webhookJob) finish(level, message string, logIt bool) {
 			})
 		}
 	}
-	if logIt {
+	// The owner's own openings (no guest key) stay out of the guests' journal.
+	if logIt && j.UserKeyID > 0 {
 		exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
 			j.UserKeyID, j.NumberID, "webhook_"+level)
 	}

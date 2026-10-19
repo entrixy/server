@@ -182,6 +182,7 @@ type Call struct {
 	// When the call was registered: one that never gets a final status is
 	// swept after an hour.
 	at time.Time
+	confirmed bool // the owner already answered the confirm request
 }
 
 // Everyone currently connected. One lock guards the lot: the traffic here is a
@@ -323,6 +324,20 @@ func expireCalls() {
 		}
 	}
 	hub.mu.Unlock()
+}
+
+// The owner's answer to a confirm request counts once: a repeated "allow"
+// would send a second do_call (the phone refuses it, but the guest saw
+// "dialing" turn into "declined").
+func (h *Hub) takeConfirm(id string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c := h.calls[id]
+	if c == nil || c.confirmed {
+		return false
+	}
+	c.confirmed = true
+	return true
 }
 
 func (h *Hub) call(id string) *Call {

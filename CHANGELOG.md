@@ -5,6 +5,15 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Openings and webhooks.** A refused press (controller or owner offline, rate
+limit, paused key) now reaches the guest with the object it belongs to, and is
+logged and counted only once it really went out. Status messages carry the
+object, so they land on the right card. The owner's answer to a confirm request
+counts once. A webhook receiver that answers a plain 2xx is a success; a webhook
+sent from the server needs a secret. The company rate limit counts presses only,
+and the guest HTTP opening works for call objects only. A restore can first ask
+`host_claim` with `dry_run` — checked, nothing moved.
+
 **Bluetooth locks: revoking a guest.** The worker keeps the owner's signed
 decisions about guests on their Bluetooth locks (new table `ble_revokes`,
 created by the migration) and hands them to the owner's guests, whose phones

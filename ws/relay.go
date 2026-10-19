@@ -60,7 +60,7 @@ func sockFire(c *Conn, msg map[string]any) {
 	}
 	dev := hub.device(info.DeviceID)
 	if dev == nil {
-		c.send(map[string]any{"type": "error", "reason": "device_offline"})
+		c.send(map[string]any{"type": "error", "number_id": num(msg, "number_id"), "reason": "device_offline"})
 		return
 	}
 	fire := map[string]any{
@@ -457,7 +457,9 @@ func webhookResult(c *Conn, msg map[string]any) {
 		message = message[:200]
 	}
 	if g := hub.guest(info.GuestOID); g != nil {
-		g.send(map[string]any{"type": "device_status", "call_id": callID,
+		// The guest's card is found by the object: without it the result of a
+		// webhook sent from the owner's phone never reached the guest.
+		g.send(map[string]any{"type": "device_status", "call_id": callID, "number_id": info.NumberID,
 			"level": level, "message": message, "final": true})
 	}
 	if info.UserKeyID > 0 {

@@ -19,6 +19,10 @@ $j         = jin();
 $device_id = (string)($j['device_id'] ?? '');
 $secret    = (string)($j['device_secret'] ?? '');
 $fp        = (string)($j['device_fp'] ?? '');
+// A check only: everything is verified, nothing moves. The app asks every
+// server first and moves only when all agree, so a refusal from the second one
+// does not leave the first moved and the backup unapplied.
+$dry       = !empty($j['dry_run']);
 
 if ($device_id === '' || $secret === '') jout(['error' => 'bad_input'], 400);
 if (!preg_match('/^[a-f0-9]{32,128}$/i', $fp)) jout(['error' => 'bad_fp'], 400);
@@ -39,6 +43,7 @@ $hid = (int)$row['id'];
 if ($fp !== '' && $cur !== null && $cur !== '' && hash_equals($cur, $fp)) {
     jout(['ok' => 1, 'claim' => 'same']);
 }
+if ($dry && ($cur === null || $cur === '')) jout(['ok' => 1, 'claim' => 'bound', 'dry_run' => 1]);
 
 // Nothing was bound yet: the first handset, the window is not spent.
 if ($cur === null || $cur === '') {
@@ -56,6 +61,7 @@ if ($last > 0 && $since < MOVE_COOLDOWN) {
     ], 429);
 }
 
+if ($dry) jout(['ok' => 1, 'claim' => 'moved', 'dry_run' => 1]);
 device_move_apply('hosts', $hid, $fp, $cur);
 audit_log($hid, 'host_moved', 'host', $hid, []);
 jout(['ok' => 1, 'claim' => 'moved']);

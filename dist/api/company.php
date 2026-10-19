@@ -290,7 +290,8 @@ if ($action === 'open') {
     if ($type !== 'call') jout(['error' => 'unsupported_object', 'type' => $type], 400);
 
     $cnt = db()->prepare(
-        'SELECT COUNT(*) FROM call_log WHERE user_key_id = ? AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)'
+        // Presses only, as everywhere: dialing/busy lines would tighten the limit.
+        'SELECT COUNT(*) FROM call_log WHERE user_key_id = ? AND status LIKE "requested%" AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)'
     );
     $cnt->execute([$key_ref]);
     if ((int)$cnt->fetchColumn() >= $GLOBALS['rate_limit_per_min']) jout(['error' => 'rate_limit'], 429);

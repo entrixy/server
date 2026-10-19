@@ -56,7 +56,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	                           (enabled = 1 AND (expires_at IS NULL OR expires_at > NOW())) AS live
 	                    FROM user_keys WHERE id = ?`, userKeyID).
 		Scan(&mode, &forceBusy, &live); err != nil || live != 1 {
-		c.send(map[string]any{"type": "error", "reason": "disabled"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "disabled"})
 		return
 	}
 	currentMode := mode.String
@@ -67,7 +67,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	c.keyMode = currentMode
 	c.mu.Unlock()
 	if currentMode == "off" || !ancestorsLive(userKeyID) {
-		c.send(map[string]any{"type": "error", "reason": "disabled"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "disabled"})
 		return
 	}
 
@@ -84,12 +84,12 @@ func guestCall(c *Conn, msg map[string]any) {
 	                 WHERE kn.user_key_id = ? AND kn.number_id = ?`, userKeyID, numberID).
 		Scan(&objType, &whURL, &whSecret, &whMode, &devIDCol, &appOnly)
 	if err != nil {
-		c.send(map[string]any{"type": "error", "reason": "forbidden"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "forbidden"})
 		return
 	}
 	// "App only" object: a browser client does not open it.
 	if appOnly.Int64 == 1 && !c.snapApp() {
-		c.send(map[string]any{"type": "error", "reason": "native_only"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "native_only"})
 		return
 	}
 	kind := objType.String
@@ -99,7 +99,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	// A Bluetooth lock is in the key's list but opens only next to it, from
 	// the guest's own handset: there is nothing to send anywhere.
 	if kind == "ble" {
-		c.send(map[string]any{"type": "error", "reason": "forbidden"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "forbidden"})
 		return
 	}
 
@@ -111,7 +111,7 @@ func guestCall(c *Conn, msg map[string]any) {
 	          WHERE user_key_id = ? AND status LIKE 'requested%'
 	            AND ts > DATE_SUB(NOW(), INTERVAL 1 MINUTE)`, userKeyID).
 		Scan(&recent) != nil || recent >= cfg.RateLimitPerMin {
-		c.send(map[string]any{"type": "error", "reason": "rate_limit"})
+		c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "rate_limit"})
 		return
 	}
 
@@ -126,31 +126,38 @@ func guestCall(c *Conn, msg map[string]any) {
 		HostID: hostID,
 		Press:  press,
 	})
-	exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
-		userKeyID, numberID, "requested")
-	go notifyPassOpen(userKeyID)
+	// The press is logged (and counted against the limit, and told up the chain)
+	// only once it actually goes somewhere: a controller or an owner offline is
+	// not an opening.
+	pressed := func() {
+		exec(`INSERT INTO call_log (user_key_id, number_id, ts, status) VALUES (?, ?, NOW(), ?)`,
+			userKeyID, numberID, "requested")
+		go notifyPassOpen(userKeyID)
+	}
 
 	switch {
 	// ── A webhook fired by the server ──
 	case kind == "webhook" && whMode.String == "server" && whURL.String != "":
 		action, bistable := resolveWebhookAction(numberID, str(msg, "action"))
+		pressed()
 		fireWebhook(webhookJob{
 			URL: whURL.String, Secret: whSecret.String,
 			NumberID: numberID, CallID: callID, HostID: hostID,
 			Requester: c, UserKeyID: userKeyID, NotifyHost: true,
 			Action: action, Bistable: bistable,
 		})
-		c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sending"})
+		c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "sending"})
 
 	// ── A controller ──
 	case kind == "device" && devIDCol.Valid && devIDCol.Int64 > 0:
 		dev := hub.device(devIDCol.Int64)
 		if dev == nil {
-			c.send(map[string]any{"type": "error", "reason": "device_offline"})
+			c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "device_offline"})
 			hub.dropCall(callID)
 			return
 		}
 		action := deviceAction(msg)
+		pressed()
 		if call := hub.call(callID); call != nil {
 			hub.mu.Lock()
 			call.DeviceID = devIDCol.Int64
@@ -163,11 +170,11 @@ func guestCall(c *Conn, msg map[string]any) {
 			// produce itself.
 			dev.send(map[string]any{"type": "sock_challenge_req",
 				"command_id": callID, "number_id": numberID})
-			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "challenge_pending"})
+			c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "challenge_pending"})
 		} else {
 			dev.send(map[string]any{"type": "device_command", "action": action,
 				"command_id": callID, "number_id": numberID})
-			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sent_to_device"})
+			c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "sent_to_device"})
 		}
 		if h := hub.host(hostID); h != nil {
 			h.send(map[string]any{"type": "device_sent", "call_id": callID,
@@ -178,10 +185,11 @@ func guestCall(c *Conn, msg map[string]any) {
 	case kind == "webhook":
 		h := hub.host(hostID)
 		if h == nil {
-			c.send(map[string]any{"type": "error", "reason": "host_offline"})
+			c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "host_offline"})
 			hub.dropCall(callID)
 			return
 		}
+		pressed()
 		// The owner's phone resolves "toggle" itself, by the position it holds.
 		dw := map[string]any{"type": "do_webhook", "call_id": callID,
 			"number_id": numberID, "user_key_id": userKeyID}
@@ -192,26 +200,27 @@ func guestCall(c *Conn, msg map[string]any) {
 			dw["press"] = press
 		}
 		h.send(dw)
-		c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "sent_to_host"})
+		c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "sent_to_host"})
 
 	// ── A phone call ──
 	default:
 		h := hub.host(hostID)
 		if h == nil {
-			c.send(map[string]any{"type": "error", "reason": "host_offline"})
+			c.send(map[string]any{"type": "error", "number_id": numberID, "reason": "host_offline"})
 			hub.dropCall(callID)
 			return
 		}
+		pressed()
 		if currentMode == "confirm" {
 			h.send(map[string]any{"type": "confirm_request", "call_id": callID,
 				"number_id": numberID, "user_key_id": userKeyID, "press": press})
-			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "awaiting_confirm"})
+			c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "awaiting_confirm"})
 		} else {
 			h.send(map[string]any{"type": "do_call", "call_id": callID,
 				"number_id": numberID, "user_key_id": userKeyID,
 				"notify":          currentMode == "notify",
 				"force_when_busy": forceBusy.Int64 == 1, "press": press})
-			c.send(map[string]any{"type": "call_status", "call_id": callID, "status": "requested"})
+			c.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": numberID, "status": "requested"})
 		}
 	}
 }
@@ -331,17 +340,20 @@ func confirmResponse(c *Conn, msg map[string]any) {
 	if info.HostID != c.snapHostID() {
 		return
 	}
+	if !hub.takeConfirm(callID) {
+		return
+	}
 	guest := hub.guest(info.GuestOID)
 	if accept {
 		c.send(map[string]any{"type": "do_call", "call_id": callID,
 			"number_id": info.NumberID, "user_key_id": info.UserKeyID, "notify": false,
 			"press": info.Press})
 		if guest != nil {
-			guest.send(map[string]any{"type": "call_status", "call_id": callID, "status": "accepted"})
+			guest.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": info.NumberID, "status": "accepted"})
 		}
 	} else {
 		if guest != nil {
-			guest.send(map[string]any{"type": "call_status", "call_id": callID, "status": "declined"})
+			guest.send(map[string]any{"type": "call_status", "call_id": callID, "number_id": info.NumberID, "status": "declined"})
 		}
 		hub.dropCall(callID)
 	}

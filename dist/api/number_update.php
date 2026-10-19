@@ -122,6 +122,18 @@ if ($effectiveMode === 'phone') {
     if (!$hasSec) { $fields[] = 'webhook_secret = ?'; $params[] = null; }
 }
 
+if ($effectiveMode === 'server') {
+    // Every request goes out signed: a server webhook without a secret is refused.
+    $cur = db()->prepare('SELECT webhook_url, webhook_secret FROM numbers WHERE id = ?');
+    $cur->execute([$id]);
+    [$finalUrl, $finalSec] = $cur->fetch(PDO::FETCH_NUM) ?: [null, null];
+    foreach ($fields as $i => $f) {
+        if ($f === 'webhook_url = ?')    $finalUrl = $params[$i];
+        if ($f === 'webhook_secret = ?') $finalSec = $params[$i];
+    }
+    if ((string)$finalUrl !== '' && (string)$finalSec === '') jout(['error' => 'webhook_secret_required'], 400);
+}
+
 $params[] = $id;
 $sql = 'UPDATE numbers SET ' . implode(', ', $fields) . ' WHERE id = ?';
 db()->prepare($sql)->execute($params);
