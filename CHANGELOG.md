@@ -5,6 +5,10 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**Included code is not served.** `lib/`, `partials/` and `lang/` answer 404 in the
+web container and are denied in the native nginx example: these files are only
+ever included, and run on their own they do nothing useful.
+
 **Pictures only sealed.** The worker relays an object's picture only as
 `avatar_cipher`, sealed with the object key; a plain `data` from the owner is
 dropped and the guest is told the object has none.

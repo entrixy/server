@@ -29,6 +29,10 @@ RewriteRule ^(ru|de|es|fr|pt|zh)/o/([A-Za-z0-9_-]{6,16})/?$ company_invite.php?c
 # web container at build time; this is the second lock, for a hand-built image.
 RedirectMatch 404 ^/w(/|$)
 
+# Code that is only ever included — libraries, page parts, dictionaries — is
+# not a page either: run on its own it does nothing useful and may say too much.
+RedirectMatch 404 ^/(lib|partials|lang)(/|$)
+
 # Service files are never served.
 <FilesMatch "\.(log|sql|tsv|ini|bak|sh|env|lock|md)$">
     Require all denied

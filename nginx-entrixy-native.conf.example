@@ -26,7 +26,7 @@ server {
 
     # Nothing private is served: settings, libraries, logs, dumps, hidden files.
     location ~ /\.(?!well-known/)            { deny all; }
-    location ~ ^/(lib|sql|mail|vendor)/      { deny all; }
+    location ~ ^/(lib|partials|lang|sql|mail|vendor)/ { deny all; }
     location ~ (^|/)_[^/]*\.php$             { deny all; }
     location ~ \.(log|sql|tsv|ini|bak|sh|env|lock|md)$ { deny all; }
 
