@@ -45,7 +45,7 @@ $st = db()->prepare(
     'SELECT uk.id, uk.enabled, uk.mode, uk.force_when_busy,
             uk.bundle_cipher, uk.bundle_cipher_updated,
             uk.parent_key_id, uk.delegate_depth, uk.guest_pub, uk.key_cipher, uk.sign_pub, uk.vouch_sig,
-            uk.native_only, uk.ble_ids, uk.bundle_dirty,
+            uk.native_only, uk.bundle_dirty,
             uk.org_id, o.name AS org_name, o.logo_hash,
             o.domain AS org_domain, o.pubkey AS org_pubkey,
             GROUP_CONCAT(kn.number_id) AS number_ids
@@ -100,7 +100,7 @@ foreach ($keys as &$k) {
     // passes only to locks the parent key holds.
     $objs = key_obj_read((int)$k['id']);
     $k['number_ids'] = [];
-    $k['ble_ids'] = $k['ble_ids'] ? array_map('intval', explode(',', $k['ble_ids'])) : [];
+    $k['ble_ids'] = [];
     $k['objects'] = [];
     foreach ($objs as $nid => $o) {
         if ($o['type'] === 'ble') $k['ble_ids'][] = $nid; else $k['number_ids'][] = $nid;

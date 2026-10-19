@@ -5,6 +5,14 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-10-19
 
+**A paused chain passes nothing on.** A holder whose key sits under a paused,
+expired or revoked one can no longer start a link, add to it, edit what they
+passed on or write to its recipient; listing, cancelling, revoking and vouching
+still work. A company's `a=status` lists objects only while its key is live,
+and extending a company's existing key is not refused at the key limit. The
+unused column `user_keys.ble_ids` is gone: run
+`ALTER TABLE user_keys DROP COLUMN ble_ids;` on a running server.
+
 **A read receipt names its message.** `message_ack` takes `h`, the first 24 hex
 digits of the SHA-256 of the message cipher, and refuses a request without it:
 a newer message from the owner that took the guest's slot meanwhile is neither

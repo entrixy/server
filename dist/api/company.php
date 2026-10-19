@@ -182,8 +182,10 @@ if ($action === 'status') {
     }
     // Once access has been granted the key's contents go straight back: the service
     // needs number_id to open, and its employee needs the object's name.
+    // A revoked key shows nothing: the objects and their names are no longer the
+    // company's business.
     $numbers = [];
-    if ($r['user_key_id']) {
+    if ($r['user_key_id'] && $r['status'] === 'issued') {
         $nq = db()->prepare(
             'SELECT kn.number_id, kn.org_label, n.type
              FROM key_numbers kn JOIN numbers n ON n.id = kn.number_id

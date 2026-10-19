@@ -37,7 +37,9 @@ $action = (string)($_GET['a'] ?? '');
 $j = jin();
 
 /** The holder, by their key plus the device fingerprint bound to it. */
-function guest_key_auth(array $j): array {
+/** $withdraw: taking back or vouching for what one passed on (list, cancel,
+ *  revoke, vouch), which a paused or revoked chain above does not stop. */
+function guest_key_auth(array $j, bool $withdraw = false): array {
     $fp = (string)($j['device_fp'] ?? '');
     // The holder proves the right by signature; the server never sees the key.
     $who = guest_auth($j, 'key_delegate', file_get_contents('php://input'));
@@ -49,8 +51,11 @@ function guest_key_auth(array $j): array {
     $st->execute([(int)$who['id']]);
     $k = $st->fetch(PDO::FETCH_ASSOC);
     if (!$k || !(int)$k['enabled']) jout(['error' => 'auth'], 401);
-    if (($k['mode'] ?? 'auto') === 'off') jout(['error' => 'revoked'], 403);
-    if ($k['expires_at'] && strtotime($k['expires_at']) < time()) jout(['error' => 'expired'], 403);
+    // The whole chain above counts: a key under a paused or revoked one passes
+    // nothing on either.
+    $why = $withdraw ? '' : guest_key_state((int)$k['id']);
+    if ($why === 'expired') jout(['error' => 'expired'], 403);
+    if ($why !== '') jout(['error' => 'revoked'], 403);
     if ($k['bound_device_fp'] && (!$fp || !hash_equals($k['bound_device_fp'], $fp))) {
         jout(['error' => 'already_bound'], 403);
     }
@@ -432,7 +437,9 @@ if ($action === 'redeem') {
 // secret and signs the recipient's public keys with their own key. The owner's
 // phone checks that signature; the server only stores it.
 if ($action === 'vouch') {
-    $k = guest_key_auth($j);
+    // Vouching grants nothing new: a key below a paused one stays paused anyway,
+    // and refusing here would leave it unvouched after the pause.
+    $k = guest_key_auth($j, true);
     $child = (int)($j['child_id'] ?? 0);
     $sig = (string)($j['sig'] ?? '');
     if ($child <= 0 || !preg_match('#^[A-Za-z0-9+/=]{80,100}$#', $sig)) jout(['error' => 'bad_input'], 400);
@@ -453,7 +460,7 @@ if ($action === 'vouch') {
 
 // ── Withdraw a part nobody has accepted ─────────────────────────────────────────
 if ($action === 'cancel') {
-    $k = guest_key_auth($j);
+    $k = guest_key_auth($j, true);
     $code = (string)($j['code'] ?? '');
     $grp  = (string)($j['grp'] ?? '');
     db()->prepare('UPDATE key_invites SET status="cancelled"
@@ -464,7 +471,7 @@ if ($action === 'cancel') {
 
 // ── One's parts and the keys issued through them ────────────────────────────────
 if ($action === 'list') {
-    $k = guest_key_auth($j);
+    $k = guest_key_auth($j, true);
     $st = db()->prepare(
         'SELECT code, grp, number_ids, ble_ids, objects, depth, status, child_key_id, created_at, expires_at, redeemed_at
          FROM key_invites WHERE parent_key_id = ? ORDER BY id DESC LIMIT 50'
@@ -578,7 +585,7 @@ if ($action === 'edit') {
 
 // ── Revoke a key one passed on ──────────────────────────────────────────────────
 if ($action === 'revoke') {
-    $k = guest_key_auth($j);
+    $k = guest_key_auth($j, true);
     $grp = (string)($j['grp'] ?? '');
     $revoked = [];
     if ((int)($j['child_id'] ?? 0) > 0) {

@@ -326,7 +326,6 @@ CREATE TABLE `user_keys` (
   `org_id` int(10) unsigned DEFAULT NULL,
   `parent_key_id` int(10) unsigned DEFAULT NULL,
   `share_grp` char(22) DEFAULT NULL,
-  `ble_ids` varchar(255) DEFAULT NULL,
   `confirmed_ids` varchar(512) DEFAULT NULL,
   `bundle_dirty` tinyint(1) NOT NULL DEFAULT 0,
   `delegate_depth` tinyint(3) unsigned NOT NULL DEFAULT 0,

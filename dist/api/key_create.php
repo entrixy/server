@@ -28,13 +28,8 @@ if (!$number_ids && $bundle_cipher_for_check === '') {
 // account's plan if the device is attached to one, otherwise the device's own.
 // Counting it differently here is not allowed — the app would show one number
 // while the server refused by another.
-$max = account_limits($host_id)['max_keys'];
-
-$cnt = db()->prepare('SELECT COUNT(*) FROM user_keys WHERE host_id = ? AND enabled = 1');
-$cnt->execute([$host_id]);
-if ((int)$cnt->fetchColumn() >= $max) {
-    jout(['error' => 'limit_reached', 'limit' => $max], 403);
-}
+// Checked below, before a new key is written: extending a company's existing
+// key adds no key and is not refused at the limit.
 
 // For a Bluetooth-only key with empty number_ids the check of object ids is
 // skipped: there is nothing for the server to validate. bundle_cipher was
@@ -166,6 +161,13 @@ if ($org_id !== null) {
         jout(['id' => $existing, 'user_key' => null, 'org_id' => $org_id,
               'delegate_depth' => 0, 'merged' => 1]);
     }
+}
+
+$max = account_limits($host_id)['max_keys'];
+$cnt = db()->prepare('SELECT COUNT(*) FROM user_keys WHERE host_id = ? AND enabled = 1');
+$cnt->execute([$host_id]);
+if ((int)$cnt->fetchColumn() >= $max) {
+    jout(['error' => 'limit_reached', 'limit' => $max], 403);
 }
 
 $st = db()->prepare(
