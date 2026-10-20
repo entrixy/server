@@ -604,6 +604,13 @@ The key point of the design is stated there plainly: the server never receives
 the string that opens a gate, neither when a key is issued nor when it is used.
 It keeps a fingerprint to find the key by and a public half to verify with.
 
+## Questions and discussion
+
+Ask, propose, report what broke in
+[Discussions](https://github.com/entrixy/server/discussions); a bug with steps
+to reproduce goes to [Issues](https://github.com/entrixy/server/issues). The
+Russian-speaking chat lives in Telegram: [t.me/entrixy](https://t.me/entrixy).
+
 ## License
 
 The server is distributed under the GNU AGPL 3.0 — the full text is in
