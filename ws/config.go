@@ -19,7 +19,6 @@ type Config struct {
 	DBName          string `json:"db_name"`
 	DBUser          string `json:"db_user"`
 	DBPass          string `json:"db_pass"`
-	AttestSecret    string `json:"app_attest_secret"`
 	RateLimitPerMin int    `json:"rate_limit_per_min"`
 	PromoBase       string `json:"promo_base_url"`
 	WebhookLog      string `json:"webhook_log"`
@@ -55,7 +54,6 @@ func loadConfig() Config {
 		DBName:          env("DB_NAME", ""),
 		DBUser:          env("DB_USER", ""),
 		DBPass:          env("DB_PASS", ""),
-		AttestSecret:    env("APP_ATTEST_SECRET", ""),
 		RateLimitPerMin: envInt("RATE_LIMIT_PER_MIN", 60),
 		PromoBase:       env("PROMO_BASE_URL", ""),
 		WebhookLog:      env("WEBHOOK_LOG", ""),

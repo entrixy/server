@@ -30,8 +30,8 @@ type Conn struct {
 	deviceFP   string
 	clientLang string
 	keyMode    string
-	// The guest proved it is the app (attestation): objects marked "app
-	// only" open for it, a browser client does not see them.
+	// Client-declared Android mode: controls app-only object visibility.
+	// This is not a security attestation.
 	appClient bool
 	sockE2EE  bool
 	lastPong  time.Time
@@ -122,7 +122,7 @@ func (c *Conn) trySend(b []byte) bool {
 // this: an "evicted" that never arrives leaves the old handset thinking it is
 // still the owner.
 func (c *Conn) sendThenClose(v any) {
-	c.send(v)                // the last frame first: closing below stops every later one
+	c.send(v) // the last frame first: closing below stops every later one
 	c.closing.Store(true)
 	go func() {
 		time.Sleep(300 * time.Millisecond)
@@ -181,7 +181,7 @@ type Call struct {
 	Press map[string]any
 	// When the call was registered: one that never gets a final status is
 	// swept after an hour.
-	at time.Time
+	at        time.Time
 	confirmed bool // the owner already answered the confirm request
 }
 

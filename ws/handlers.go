@@ -377,6 +377,10 @@ func guestHello(c *Conn, msg map[string]any) {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "needs_new_key"})
 		return
 	}
+	if len(signPubDevice) != 32 {
+		c.sendThenClose(map[string]any{"type": "error", "reason": "already_bound"})
+		return
+	}
 	keySuite := signSuite.String
 	if keySuite == "" {
 		keySuite = "v1"
@@ -432,16 +436,10 @@ func guestHello(c *Conn, msg map[string]any) {
 		}
 	}
 
-	// The app signs its greeting with an attestation the browser client cannot
-	// produce. "App only" is set per object: a browser sees only the others,
-	// and a key whose every object is "app only" does not let it in at all.
-	attestTS := num(msg, "attest_ts")
-	attest := str(msg, "attest")
-	mac := hmac.New(sha256.New, []byte(cfg.AttestSecret))
-	fmt.Fprintf(mac, "%s|%d", hash, attestTS)
-	expect := hex.EncodeToString(mac.Sum(nil))
-	appClient := attestTS > 0 && abs64(time.Now().Unix()-attestTS) <= 120 && attest != "" &&
-		hmac.Equal([]byte(expect), []byte(attest))
+	// Client classification is a compatibility policy, not attestation. Both
+	// Android clients send "app"; PWA sends "web". Authentication, device
+	// binding and command signatures are checked independently.
+	appClient := str(msg, "client") == "app"
 	if nativeOnly.Int64 == 1 && !appClient {
 		c.sendThenClose(map[string]any{"type": "error", "reason": "native_only"})
 		return
@@ -485,7 +483,7 @@ func guestHello(c *Conn, msg map[string]any) {
 	}
 	c.mu.Lock()
 	c.role = "guest"
-	c.deviceFP = deviceFP   // which handset: a move closes only the others
+	c.deviceFP = deviceFP // which handset: a move closes only the others
 	c.userKeyID = ukID
 	c.hostID = hostID
 	c.keyMode = keyMode

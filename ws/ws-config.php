@@ -17,7 +17,6 @@ echo json_encode([
     'db_name'            => $GLOBALS['db']['name'],
     'db_user'            => $GLOBALS['db']['user'],
     'db_pass'            => $GLOBALS['db']['pass'],
-    'app_attest_secret'  => $GLOBALS['app_attest_secret'],
     'rate_limit_per_min' => (int)$GLOBALS['rate_limit_per_min'],
     'promo_base_url'     => 'https://entrixy.com',
     'access_code'        => (string)($GLOBALS['access_code'] ?? ''),

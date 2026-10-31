@@ -5,6 +5,13 @@ and what matters is what a running one has to do to catch up.
 
 ## 2026-11-01
 
+**Android-only is a client-type policy.** Authenticated guest greetings with
+`client: "app"` can use app-only objects; `client: "web"`, missing and unknown
+values cannot. This is not app attestation and can be imitated by a custom
+client. No shared app secret or owner approval is required. Device binding,
+request signatures and controller authorization remain separate checks. Both
+Entrixy Android clients support this policy.
+
 Guest browser requests now bind before use and sign with a device-specific
 Ed25519 pair. Binding serializes changes under a database row lock, so concurrent
 activation cannot replace another device's signing key. Ordinary requests with
