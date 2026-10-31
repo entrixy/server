@@ -35,6 +35,9 @@ if ($device_pub_in !== '') {
 
 // Who is asking is told by the signature; the server never sees the key.
 $via = null;
+db()->beginTransaction();
+$lock = db()->prepare('SELECT id FROM user_keys WHERE key_hash = ? FOR UPDATE');
+$lock->execute([strtolower(trim((string)($_SERVER['HTTP_X_ENTRIXY_KEY'] ?? '')))]);
 $who = guest_auth($j, 'key_bind', file_get_contents('php://input'), $via);
 if (!$who) {
     // The link is genuine, but the key has already settled on another handset
@@ -75,12 +78,14 @@ switch ($d['action']) {
     case 'bind':
         device_move_bind('user_keys', $kid, $device_fp);
         $remember_pub();
+        db()->commit();
         jout(['ok' => 1, 'bound' => 'new', 'device_key' => $device_pub !== null]);
 
     case 'same':
         // The same phone after a reinstall: it derives the same pair from the
         // key and its own hardware, so there is nothing to replace.
         $remember_pub();
+        db()->commit();
         jout(['ok' => 1, 'bound' => 'same', 'device_key' => $device_pub !== null]);
 
     case 'move':
@@ -105,6 +110,7 @@ switch ($d['action']) {
         // removed the key it had just moved.
         db()->prepare('INSERT INTO pending_notifications (kind, user_key_id, created_at) VALUES (?, ?, NOW())')
             ->execute(['key_moved', $kid]);
+        db()->commit();
         jout(['ok' => 1, 'bound' => 'moved', 'device_key' => $device_pub !== null]);
 
     case 'wait':

@@ -3,6 +3,17 @@
 By date, not by version number: the server is installed from this repository,
 and what matters is what a running one has to do to catch up.
 
+## 2026-11-01
+
+Guest browser requests now bind before use and sign with a device-specific
+Ed25519 pair. Binding serializes changes under a database row lock, so concurrent
+activation cannot replace another device's signing key. Ordinary requests with
+a legacy bound key must first upgrade its binding; the invitation signing pair
+cannot authorize operations after a device pair is registered. No schema change.
+
+Isolated signature checks: `php tests/guest-auth.php` and
+`node tests/pwa-device-keys.cjs`. They do not touch production credentials or DB.
+
 ## 2026-10-19
 
 **At most 200 controllers per phone.** `device_register` refuses past that with

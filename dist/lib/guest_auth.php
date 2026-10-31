@@ -63,6 +63,7 @@ function guest_auth(array $j, string $endpoint, string $rawBody, ?string &$via =
         $st->execute([$key_id]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if (!$row || empty($row['sign_pub'])) return null;
+        if ($endpoint !== 'key_bind' && !empty($row['bound_device_fp']) && empty($row['sign_pub_device'])) return null;
         // Once the key has settled on a device, only that device's own pair is
         // accepted. The pair derived from the link is dead from that moment, so
         // a copy of the link that surfaces later opens nothing.

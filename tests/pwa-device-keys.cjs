@@ -1,0 +1,25 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const {webcrypto, hkdfSync, createPrivateKey, createPublicKey, verify, createHash} = require('node:crypto');
+const assert = require('node:assert/strict');
+const context = {window:{}, crypto:webcrypto, TextEncoder, TextDecoder, Uint8Array, URL, URLSearchParams, btoa, atob};
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../dist/app/crypto.js'),'utf8'),context);
+const api = context.window.EntrixyCrypto;
+const key = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+const fp = 'b'.repeat(64);
+const seed = Buffer.from(hkdfSync('sha256',key,fp,'entrixy-guest-device-v1',32));
+const privateKey = createPrivateKey({key:Buffer.concat([Buffer.from('302e020100300506032b657004220420','hex'),seed]),format:'der',type:'pkcs8'});
+const publicKey = createPublicKey(privateKey);
+(async()=>{
+  assert.equal(await api.devicePub(key,fp),publicKey.export({format:'jwk'}).x);
+  assert.notEqual(await api.devicePub(key,fp),await api.devicePub(key,'c'.repeat(64)));
+  assert.notEqual(await api.devicePub(key,fp),await api.signPubB64(key));
+  const body = JSON.stringify({device_fp:fp});
+  const h = await api.signHeaders(key,'key_bind',body,fp);
+  const material = `v1.${h['X-Entrixy-Key']}.${h['X-Entrixy-Ts']}.${h['X-Entrixy-Nonce']}.key_bind.${createHash('sha256').update(body).digest('hex')}`;
+  assert(verify(null,Buffer.from(material),publicKey,Buffer.from(h['X-Entrixy-Sig'],'base64')));
+  const hello = await api.helloFields(key,fp);
+  const greeting = `v1.${hello.key_id}.${hello.ts}.${hello.nonce}.guest_hello.${createHash('sha256').update(fp).digest('hex')}`;
+  assert(verify(null,Buffer.from(greeting),publicKey,Buffer.from(hello.sig,'base64')));
+  console.log('PASS device derivation, separation, HTTP and WebSocket signatures');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -168,25 +168,30 @@
    * pair is derived from the string itself, so the link stays as it is and
    * there is nothing extra to keep.
    */
-  async function signSeed(userKey) {
+  async function signSeed(userKey, deviceFp) {
     const ikm = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(userKey), 'HKDF', false, ['deriveBits']);
     const bits = await crypto.subtle.deriveBits({
       name: 'HKDF', hash: 'SHA-256',
-      salt: new Uint8Array(0),
-      info: new TextEncoder().encode('entrixy-guest-sign-v1'),
+      salt: deviceFp ? new TextEncoder().encode(deviceFp) : new Uint8Array(0),
+      info: new TextEncoder().encode(deviceFp ? 'entrixy-guest-device-v1' : 'entrixy-guest-sign-v1'),
     }, ikm, 256);
     return new Uint8Array(bits);
   }
 
   // The browser accepts a private key only wrapped: sixteen bytes of header
   // and then the seed.
-  async function signKey(userKey) {
-    const seed = await signSeed(userKey);
+  async function signKey(userKey, deviceFp, extractable = false) {
+    const seed = await signSeed(userKey, deviceFp);
     const der = new Uint8Array(48);
     der.set([0x30,0x2e,0x02,0x01,0x00,0x30,0x05,0x06,0x03,0x2b,0x65,0x70,0x04,0x22,0x04,0x20], 0);
     der.set(seed, 16);
-    return crypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, false, ['sign']);
+    return crypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, extractable, ['sign']);
+  }
+
+  async function devicePub(userKey, deviceFp) {
+    const key = await signKey(userKey, deviceFp, true);
+    return (await crypto.subtle.exportKey('jwk', key)).x;
   }
 
   function hexOf(buf) {
@@ -212,13 +217,13 @@
   }
 
   /** Signature headers for one request. */
-  async function signHeaders(userKey, endpoint, body) {
+  async function signHeaders(userKey, endpoint, body, deviceFp) {
     const ts = String(Math.floor(Date.now() / 1000));
     const nonce = hexOf(crypto.getRandomValues(new Uint8Array(16)));
     const bodyHash = hexOf(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)));
     const keyId = await keyHash(userKey);
     const material = `${SUITE}.${keyId}.${ts}.${nonce}.${endpoint}.${bodyHash}`;
-    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, await signKey(userKey),
+    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, await signKey(userKey, deviceFp),
       new TextEncoder().encode(material));
     return {
       'X-Entrixy-Key': keyId, 'X-Entrixy-Ts': ts, 'X-Entrixy-Nonce': nonce,
@@ -255,7 +260,7 @@
     const fpHash = hexOf(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(deviceFp)));
     const keyId = await keyHash(userKey);
     const material = `${SUITE}.${keyId}.${ts}.${nonce}.guest_hello.${fpHash}`;
-    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, await signKey(userKey),
+    const sig = await crypto.subtle.sign({ name: 'Ed25519' }, await signKey(userKey, deviceFp),
       new TextEncoder().encode(material));
     return { key_id: keyId, ts, nonce, suite: SUITE,
              sig: btoa(String.fromCharCode(...new Uint8Array(sig))) };
@@ -320,7 +325,7 @@
 
   global.EntrixyCrypto = {
     newUserKey, signPubB64, newSealPair, openKey,
-    signHeaders, helloFields, pressFields, passMac, keyHash, agreeSuite, SUITE,
+    signHeaders, helloFields, pressFields, passMac, keyHash, agreeSuite, SUITE, devicePub,
     encryptString, decryptString, decryptBytes,
     hmacSha256, b64Decode, b64Encode,
     b64uEncode, b64uDecode,
