@@ -629,3 +629,7 @@ Third-party dependencies retain their licenses; see [THIRD_PARTY_NOTICES.md](THI
 
 The name Entrixy and the logo are not granted by the license. Your own build
 gets its own name.
+
+For modified deployments, set `ENTRIXY_SOURCE_URL` to the complete corresponding
+source of the running version. The web footer exposes that URL and the bundled
+license texts. Runtime images retain notices under `/usr/share/doc/entrixy/`.

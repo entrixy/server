@@ -65,3 +65,7 @@ COPY --chown=www-data:www-data dist/ /var/www/html/
 # The websocket worker runs in its own container and has no business in the web
 # root: over HTTP its source only ever answers with an error and a path.
 RUN rm -rf /var/www/html/w
+
+# Retain notices in the runtime image as well as in the source archive.
+COPY licenses/ /usr/share/doc/entrixy/licenses/
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/entrixy/

@@ -17,7 +17,8 @@ for the MPL-covered files as required by MPL 2.0. The source distribution
 contains those files. Modified MPL files retain MPL obligations.
 
 The APCu source archive under vendor/ retains its own PHP license and notices
-inside that archive. Container images include additional operating-system,
+inside that archive. Copies are also retained in `licenses/APCu-PHP-license.txt`
+and `licenses/APCu-NOTICE.txt` and in runtime images. Container images include additional operating-system,
 PHP, Go and Caddy components under their respective upstream licenses.
 
 Separately distributed clients, firmware and documentation have their own

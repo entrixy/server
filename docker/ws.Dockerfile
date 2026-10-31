@@ -15,3 +15,7 @@ RUN apk add --no-cache ca-certificates tzdata
 COPY --from=build /entrixy-ws /usr/local/bin/entrixy-ws
 USER nobody
 CMD ["entrixy-ws"]
+
+# Retain notices in the runtime image as well as in the source archive.
+COPY licenses/ /usr/share/doc/entrixy/licenses/
+COPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/doc/entrixy/
