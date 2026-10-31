@@ -620,9 +620,12 @@ version over a network, the source of those modifications has to be available
 to them. Terms for those to whom that does not suit are a separate
 conversation with the author.
 
-The protocol with its test vectors and the reference application are published
-separately and under Apache 2.0: their job is to let other implementations
-appear freely.
+Separately distributed protocol materials, reference clients and firmware have
+their own license notices. Consult the specific artifact and release; the
+server license does not relicense them. Entrixy Open source archives 0.2.0–0.2.3
+include AGPL-3.0. Previously granted licenses remain valid.
+
+Third-party dependencies retain their licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 The name Entrixy and the logo are not granted by the license. Your own build
 gets its own name.
